@@ -230,7 +230,7 @@ LOGGING = {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
-            'filename': 'errors.log',
+            'filename': '/var/log/gunicorn/errors.log',
         },
         'null': {
             'class': 'logging.NullHandler'
@@ -254,14 +254,14 @@ LOGGING = {
         'db': {
             'class': 'logging.handlers.RotatingFileHandler',
             'formatter': 'brief',
-            'filename': 'db.log',
+            'filename': '/var/log/gunicorn/db.log',
             'maxBytes': 1024 * 1024 * 10,  # SEC-12 fix: 10 MB (was 1 KB)
             'backupCount': 3
         },
         'celery': {
             'class': 'logging.handlers.RotatingFileHandler',
             'formatter': 'simple',
-            'filename': 'celery.log',
+            'filename': '/var/log/gunicorn/celery.log',
             'maxBytes': 1024 * 1024 * 100,  # 100 mb
         },
     },

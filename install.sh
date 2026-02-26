@@ -136,7 +136,19 @@ echo "#########################################################################"
 make certs && make build && make up && tput setaf 2 && echo "reNgine is installed!!!" && failed=0 || failed=1
 
 if [ "${failed}" -eq 0 ]; then
-  sleep 3
+  echo " "
+  tput setaf 4;
+  echo "#########################################################################"
+  echo "Waiting for database to be ready..."
+  echo "#########################################################################"
+  sleep 10
+
+  echo " "
+  tput setaf 4;
+  echo "#########################################################################"
+  echo "Applying database migrations"
+  echo "#########################################################################"
+  make migrate
 
   echo " "
   tput setaf 4;
@@ -144,7 +156,6 @@ if [ "${failed}" -eq 0 ]; then
   echo "Creating an account"
   echo "#########################################################################"
   make username isNonInteractive=$isNonInteractive
-  make migrate
 
   tput setaf 2 && printf "\n%s\n" "Thank you for installing reNgine, happy recon!!"
   echo "In case you have unapplied migrations (see above in red), run 'make migrate'"
