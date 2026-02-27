@@ -2731,7 +2731,7 @@ class EndPointViewSet(viewsets.ModelViewSet):
 
 	def filter_queryset(self, qs):
 		qs = self.queryset.filter()
-		search_value = self.request.GET.get(u'search[value]', None)
+		search_value = self.request.GET.get(u'search[value]', '')
 		_order_col = self.request.GET.get(u'order[0][column]', None)
 		_order_direction = self.request.GET.get(u'order[0][dir]', None)
 		if search_value or _order_col or _order_direction:
@@ -2758,7 +2758,7 @@ class EndPointViewSet(viewsets.ModelViewSet):
 				order_col = f'-{order_col}'
 			# if the search query is separated by = means, it is a specific lookup
 			# divide the search query into two half and lookup
-			if '=' in search_value or '&' in search_value or '|' in search_value or '>' in search_value or '<' in search_value or '!' in search_value:
+			if search_value and ('=' in search_value or '&' in search_value or '|' in search_value or '>' in search_value or '<' in search_value or '!' in search_value):
 				if '&' in search_value:
 					complex_query = search_value.split('&')
 					for query in complex_query:
@@ -2772,7 +2772,7 @@ class EndPointViewSet(viewsets.ModelViewSet):
 							qs = self.special_lookup(query.strip()) | qs
 				else:
 					qs = self.special_lookup(search_value)
-			else:
+			elif search_value:
 				qs = self.general_lookup(search_value)
 			return qs.order_by(order_col)
 		return qs
@@ -2997,7 +2997,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 
 	def filter_queryset(self, qs):
 		qs = self.queryset.filter()
-		search_value = self.request.GET.get(u'search[value]', None)
+		search_value = self.request.GET.get(u'search[value]', '')
 		_order_col = self.request.GET.get(u'order[0][column]', None)
 		_order_direction = self.request.GET.get(u'order[0][dir]', None)
 		if search_value or _order_col or _order_direction:
@@ -3018,7 +3018,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			# if the search query is separated by = means, it is a specific lookup
 			# divide the search query into two half and lookup
 			operators = ['=', '&', '|', '>', '<', '!']
-			if any(x in search_value for x in operators):
+			if search_value and any(x in search_value for x in operators):
 				if '&' in search_value:
 					complex_query = search_value.split('&')
 					for query in complex_query:
@@ -3032,7 +3032,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 							qs = self.special_lookup(query.strip()) | qs
 				else:
 					qs = self.special_lookup(search_value)
-			else:
+			elif search_value:
 				qs = self.general_lookup(search_value)
 			return qs.order_by(order_col)
 		return qs.order_by('-severity')

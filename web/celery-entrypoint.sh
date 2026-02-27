@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+# NOTE: Do NOT use 'set -e' here! Tool installations may fail (e.g. theHarvester)
+# but should not prevent Celery workers from starting. Each install step uses
+# '|| true' to handle failures gracefully.
 
 # Fix dependency compatibility issues (needed for older images)
 pip3 install --quiet --upgrade tenacity 2>/dev/null || true
@@ -22,7 +24,7 @@ done
 echo "Migrations are ready!"
 
 
-python3 manage.py collectstatic --no-input --clear
+python3 manage.py collectstatic --no-input
 
 # Load default engines, keywords, and external tools
 python3 manage.py loaddata fixtures/default_scan_engines.yaml --app scanEngine.EngineType
@@ -39,14 +41,14 @@ Package: firefox
 Pin: version 1:1snap1-0ubuntu2
 Pin-Priority: -1
 ' | tee /etc/apt/preferences.d/mozilla-firefox
-apt update
-apt install firefox -y
+apt update || true
+apt install firefox -y || true
 
 # Temporary fix for whatportis bug - See https://github.com/yogeshojha/rengine/issues/984
-sed -i 's/purge()/truncate()/g' /usr/local/lib/python3.10/dist-packages/whatportis/cli.py
+sed -i 's/purge()/truncate()/g' /usr/local/lib/python3.10/dist-packages/whatportis/cli.py || true
 
 # update whatportis
-yes | whatportis --update
+yes | whatportis --update || true
 
 # clone dirsearch default wordlist
 if [ ! -d "/usr/src/wordlist" ]
@@ -74,7 +76,7 @@ then
   echo "Cloning Sublist3r"
   git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
 fi
-python3 -m pip install -r /usr/src/github/Sublist3r/requirements.txt
+python3 -m pip install -r /usr/src/github/Sublist3r/requirements.txt || true
 
 # clone OneForAll
 if [ ! -d "/usr/src/github/OneForAll" ]
@@ -82,7 +84,7 @@ then
   echo "Cloning OneForAll"
   git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
 fi
-python3 -m pip install -r /usr/src/github/OneForAll/requirements.txt
+python3 -m pip install -r /usr/src/github/OneForAll/requirements.txt || true
 
 # clone eyewitness
 if [ ! -d "/usr/src/github/EyeWitness" ]
@@ -98,7 +100,15 @@ then
   echo "Cloning theHarvester"
   git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
 fi
-python3 -m pip install -r /usr/src/github/theHarvester/requirements/base.txt
+# theHarvester changed their repo structure - try multiple possible requirement paths
+if [ -f "/usr/src/github/theHarvester/requirements/base.txt" ]; then
+  python3 -m pip install -r /usr/src/github/theHarvester/requirements/base.txt || true
+elif [ -f "/usr/src/github/theHarvester/requirements.txt" ]; then
+  python3 -m pip install -r /usr/src/github/theHarvester/requirements.txt || true
+else
+  echo "WARNING: theHarvester requirements file not found, skipping installation"
+  echo "Available files in theHarvester: $(ls /usr/src/github/theHarvester/ 2>/dev/null || echo 'directory not found')"
+fi
 
 # clone vulscan
 if [ ! -d "/usr/src/github/scipag_vulscan" ]
@@ -111,7 +121,7 @@ then
 fi
 
 # install h8mail
-python3 -m pip install h8mail
+python3 -m pip install h8mail || true
 
 # install gf patterns
 if [ ! -d "/root/Gf-Patterns" ];
@@ -130,8 +140,8 @@ then
 fi
 
 # test tools, required for configuration
-naabu && subfinder && amass
-nuclei
+naabu && subfinder && amass || true
+nuclei || true
 
 if [ ! -d "/root/nuclei-templates/geeknik_nuclei_templates" ];
 then
@@ -178,7 +188,7 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 #python3 -m pip uninstall -y httpcore
 
 # TEMPORARY FIX FOR langchain
-pip install tenacity==8.2.2
+pip install tenacity==8.2.2 || true
 
 loglevel='info'
 if [ "$DEBUG" == "1" ]; then
