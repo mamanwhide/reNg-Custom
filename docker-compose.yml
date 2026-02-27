@@ -8,7 +8,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=${POSTGRES_PORT}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "0.0.0.0:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     networks:
@@ -108,7 +108,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
     ports:
-      - "127.0.0.1:8000:8000"
+      - "0.0.0.0:8000:8000"
     depends_on:
       - db
       - celery
@@ -147,7 +147,7 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     ports:
-      - "127.0.0.1:11434:11434"
+      - "0.0.0.0:11434:11434"
     networks:
       - rengine_network
 

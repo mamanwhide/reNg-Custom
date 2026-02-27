@@ -480,6 +480,7 @@ def subdomain_discovery(
 	safe_host = shlex.quote(host)
 	for tool in tools:
 		cmd = None
+		cmd_env = None
 		logger.info(f'Scanning subdomains for {host} with {tool}')
 		proxy = get_random_proxy()
 		if tool in default_subdomain_tools:
@@ -530,7 +531,9 @@ def subdomain_discovery(
 				results_file = self.results_dir + '/subdomains_netlas.txt'
 				cmd = f'netlas search -d domain -i domain domain:"*.{safe_host}" -f json'
 				netlas_key = get_netlas_key()
-				cmd += f' -a {netlas_key}' if netlas_key else ''
+				# MED-04 fix: Pass API key via environment variable instead of command line
+				if netlas_key:
+					cmd_env = {**os.environ, 'NETLAS_API_KEY': netlas_key}
 				cmd_extract = f"grep -oE '([a-zA-Z0-9]([-a-zA-Z0-9]*[a-zA-Z0-9])?\.)+{safe_host}'"
 				cmd += f' | {cmd_extract} > {results_file}'
 
@@ -573,7 +576,8 @@ def subdomain_discovery(
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id)
+				activity_id=self.activity_id,
+				env=cmd_env)
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -666,7 +670,7 @@ def subdomain_discovery(
 
 
 @app.task(name='osint', queue='main_scan_queue', base=RengineTask, bind=True)
-def osint(self, host=None, ctx={}, description=None):
+def osint(self, host=None, ctx=None, description=None):
 	"""Run Open-Source Intelligence tools on selected domain.
 
 	Args:
@@ -675,6 +679,8 @@ def osint(self, host=None, ctx={}, description=None):
 	Returns:
 		dict: Results from osint discovery and dorking.
 	"""
+	if ctx is None:
+		ctx = {}
 	config = self.yaml_configuration.get(OSINT) or OSINT_DEFAULT_CONFIG
 	results = {}
 
@@ -719,7 +725,9 @@ def osint(self, host=None, ctx={}, description=None):
 
 
 @app.task(name='osint_discovery', queue='osint_discovery_queue', bind=False)
-def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx=None):
+	if ctx is None:
+		ctx = {}
 	"""Run OSINT discovery.
 
 	Args:
@@ -1074,7 +1082,9 @@ def dorking(config, host, scan_history_id, results_dir):
 
 
 @app.task(name='theHarvester', queue='theHarvester_queue', bind=False)
-def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx=None):
+	if ctx is None:
+		ctx = {}
 	"""Run theHarvester to get save emails, hosts, employees found in domain.
 
 	Args:
@@ -1194,7 +1204,9 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 
 
 @app.task(name='h8mail', queue='h8mail_queue', bind=False)
-def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx=None):
+	if ctx is None:
+		ctx = {}
 	"""Run h8mail.
 
 	Args:
@@ -1239,7 +1251,9 @@ def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 
 
 @app.task(name='screenshot', queue='main_scan_queue', base=RengineTask, bind=True)
-def screenshot(self, ctx={}, description=None):
+def screenshot(self, ctx=None, description=None):
+	if ctx is None:
+		ctx = {}
 	"""Uses EyeWitness to gather screenshot of a domain and/or url.
 
 	Args:
@@ -1342,7 +1356,11 @@ def screenshot(self, ctx={}, description=None):
 
 
 @app.task(name='port_scan', queue='main_scan_queue', base=RengineTask, bind=True)
-def port_scan(self, hosts=[], ctx={}, description=None):
+def port_scan(self, hosts=None, ctx=None, description=None):
+	if hosts is None:
+		hosts = []
+	if ctx is None:
+		ctx = {}
 	"""Run port scan.
 
 	Args:
@@ -1611,7 +1629,9 @@ def nmap(
 
 
 @app.task(name='waf_detection', queue='main_scan_queue', base=RengineTask, bind=True)
-def waf_detection(self, ctx={}, description=None):
+def waf_detection(self, ctx=None, description=None):
+	if ctx is None:
+		ctx = {}
 	"""
 	Uses wafw00f to check for the presence of a WAF.
 
@@ -1672,7 +1692,9 @@ def waf_detection(self, ctx={}, description=None):
 
 
 @app.task(name='dir_file_fuzz', queue='main_scan_queue', base=RengineTask, bind=True)
-def dir_file_fuzz(self, ctx={}, description=None):
+def dir_file_fuzz(self, ctx=None, description=None):
+	if ctx is None:
+		ctx = {}
 	"""Perform directory scan, and currently uses `ffuf` as a default tool.
 
 	Args:
@@ -1881,7 +1903,11 @@ def dir_file_fuzz(self, ctx={}, description=None):
 
 
 @app.task(name='fetch_url', queue='main_scan_queue', base=RengineTask, bind=True)
-def fetch_url(self, urls=[], ctx={}, description=None):
+def fetch_url(self, urls=None, ctx=None, description=None):
+	if urls is None:
+		urls = []
+	if ctx is None:
+		ctx = {}
 	"""Fetch URLs using different tools like gauplus, gau, gospider, waybackurls ...
 
 	Args:
@@ -2130,7 +2156,11 @@ def parse_curl_output(response):
 
 
 @app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
-def vulnerability_scan(self, urls=[], ctx={}, description=None):
+def vulnerability_scan(self, urls=None, ctx=None, description=None):
+	if urls is None:
+		urls = []
+	if ctx is None:
+		ctx = {}
 	"""
 		This function will serve as an entrypoint to vulnerability scan.
 		All other vulnerability scan will be run from here including nuclei, crlfuzz, etc
@@ -2189,7 +2219,9 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	return None
 
 @app.task(name='nuclei_individual_severity_module', queue='main_scan_queue', base=RengineTask, bind=True)
-def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, should_fetch_gpt_report, ctx={}, description=None):
+def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, should_fetch_gpt_report, ctx=None, description=None):
+	if ctx is None:
+		ctx = {}
 	'''
 		This celery task will run vulnerability scan in parallel.
 		All severities supplied should run in parallel as grouped tasks.
@@ -2457,7 +2489,11 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 		gpt_report.save()
 
 @app.task(name='nuclei_scan', queue='main_scan_queue', base=RengineTask, bind=True)
-def nuclei_scan(self, urls=[], ctx={}, description=None):
+def nuclei_scan(self, urls=None, ctx=None, description=None):
+	if urls is None:
+		urls = []
+	if ctx is None:
+		ctx = {}
 	"""HTTP vulnerability scan using Nuclei
 
 	Args:
@@ -2597,7 +2633,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	return None
 
 @app.task(name='dalfox_xss_scan', queue='main_scan_queue', base=RengineTask, bind=True)
-def dalfox_xss_scan(self, urls=None, ctx={}, description=None):
+def dalfox_xss_scan(self, urls=None, ctx=None, description=None):
+	if ctx is None:
+		ctx = {}
 	"""XSS Scan using dalfox
 
 	Args:
@@ -2869,7 +2907,9 @@ def crlfuzz_scan(self, urls=None, ctx=None, description=None):
 
 
 @app.task(name='s3scanner', queue='main_scan_queue', base=RengineTask, bind=True)
-def s3scanner(self, ctx={}, description=None):
+def s3scanner(self, ctx=None, description=None):
+	if ctx is None:
+		ctx = {}
 	"""Bucket Scanner
 
 	Args:
@@ -3820,7 +3860,9 @@ def parse_crlfuzz_result(url):
 	}
 
 
-def record_exists(model, data, exclude_keys=[]):
+def record_exists(model, data, exclude_keys=None):
+	if exclude_keys is None:
+		exclude_keys = []
 	"""
 	Check if a record already exists in the database based on the given data.
 
@@ -4604,7 +4646,9 @@ def save_endpoint(
 	return endpoint, created
 
 
-def save_subdomain(subdomain_name, ctx={}):
+def save_subdomain(subdomain_name, ctx=None):
+	if ctx is None:
+		ctx = {}
 	"""Get or create Subdomain object.
 
 	Args:
@@ -4713,7 +4757,9 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
 	return ip, created
 
 
-def save_imported_subdomains(subdomains, ctx={}):
+def save_imported_subdomains(subdomains, ctx=None):
+	if ctx is None:
+		ctx = {}
 	"""Take a list of subdomains imported and write them to from_imported.txt.
 
 	Args:

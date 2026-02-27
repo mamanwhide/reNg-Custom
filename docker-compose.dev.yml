@@ -12,7 +12,7 @@ services:
     networks:
       - rengine_network
     ports:
-      - "127.0.0.1:5432:5432"
+      - "0.0.0.0:5432:5432"
 
   redis:
     image: "redis:alpine"
@@ -105,7 +105,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
     ports:
-      - "8000:8000"
+      - "0.0.0.0:8000:8000"
     depends_on:
       - db
       - celery

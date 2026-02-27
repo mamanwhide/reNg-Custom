@@ -24,7 +24,7 @@ if command -v gosu &> /dev/null && id -u rengine &> /dev/null; then
         --graceful-timeout 30 \
         --max-requests 1000 \
         --max-requests-jitter 50 \
-        --limit-request-line 8190 \
+        --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" \
         --access-logfile /var/log/gunicorn/access.log \
         --error-logfile /var/log/gunicorn/error.log \
         --log-level info
@@ -38,7 +38,7 @@ else
         --graceful-timeout 30 \
         --max-requests 1000 \
         --max-requests-jitter 50 \
-        --limit-request-line 8190 \
+        --limit-request-line "${GUNICORN_LIMIT_REQUEST_LINE:-8190}" \
         --access-logfile /var/log/gunicorn/access.log \
         --error-logfile /var/log/gunicorn/error.log \
         --log-level info
