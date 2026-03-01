@@ -3,8 +3,27 @@
 # but should not prevent Celery workers from starting. Each install step uses
 # '|| true' to handle failures gracefully.
 
+# ── Network availability check ──────────────────────────────────────────────
+# If we can't reach PyPI, skip ALL network-dependent installations.
+# This prevents multi-hour pip retry loops when running without internet
+# (e.g. VPN-only environments, air-gapped networks).
+NETWORK_AVAILABLE=false
+if python3 -c "import socket; socket.setdefaulttimeout(5); socket.getaddrinfo('pypi.org', 443)" 2>/dev/null; then
+  NETWORK_AVAILABLE=true
+  echo "Network available — will install/update external tools"
+else
+  echo "WARNING: No internet access (DNS resolution failed for pypi.org)"
+  echo "Skipping external tool installation — using pre-installed tools only"
+  echo "Celery workers will start immediately"
+fi
+
+# Common pip flags to prevent long retries when network is flaky
+PIP_NETWORK_FLAGS="--retries 1 --timeout 15"
+
 # Fix dependency compatibility issues (needed for older images)
-pip3 install --quiet --upgrade tenacity 2>/dev/null || true
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  pip3 install --quiet --upgrade $PIP_NETWORK_FLAGS tenacity 2>/dev/null || true
+fi
 
 # Wait for web container to finish migrations instead of running them concurrently
 echo "Waiting for database migrations to be applied by web container..."
@@ -32,7 +51,8 @@ python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.Inter
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
 # install firefox https://askubuntu.com/a/1404401
-echo '
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  echo '
 Package: *
 Pin: release o=LP-PPA-mozillateam
 Pin-Priority: 1001
@@ -41,8 +61,11 @@ Package: firefox
 Pin: version 1:1snap1-0ubuntu2
 Pin-Priority: -1
 ' | tee /etc/apt/preferences.d/mozilla-firefox
-apt update || true
-apt install firefox -y || true
+  apt update || true
+  apt install firefox -y || true
+else
+  echo "Skipping Firefox install (no network)"
+fi
 
 # Temporary fix for whatportis bug - See https://github.com/yogeshojha/rengine/issues/984
 sed -i 's/purge()/truncate()/g' /usr/local/lib/python3.10/dist-packages/whatportis/cli.py || true
@@ -57,80 +80,86 @@ then
   mkdir /usr/src/wordlist
 fi
 
-if [ ! -f "/usr/src/wordlist/" ]
-then
-  echo "Downloading Default Directory Bruteforce Wordlist"
-  wget https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt -O /usr/src/wordlist/dicc.txt
-fi
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  if [ ! -f "/usr/src/wordlist/dicc.txt" ]
+  then
+    echo "Downloading Default Directory Bruteforce Wordlist"
+    timeout 30 wget https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt -O /usr/src/wordlist/dicc.txt || true
+  fi
 
-# check if default wordlist for amass exists
-if [ ! -f /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt ];
-then
-  echo "Downloading Deepmagic top 50000 Wordlist"
-  wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt
-fi
+  # check if default wordlist for amass exists
+  if [ ! -f /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt ];
+  then
+    echo "Downloading Deepmagic top 50000 Wordlist"
+    timeout 30 wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt || true
+  fi
 
-# clone Sublist3r
-if [ ! -d "/usr/src/github/Sublist3r" ]
-then
-  echo "Cloning Sublist3r"
-  git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
-fi
-python3 -m pip install -r /usr/src/github/Sublist3r/requirements.txt || true
+  # clone Sublist3r
+  if [ ! -d "/usr/src/github/Sublist3r" ]
+  then
+    echo "Cloning Sublist3r"
+    timeout 60 git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r || true
+  fi
+  python3 -m pip install $PIP_NETWORK_FLAGS -r /usr/src/github/Sublist3r/requirements.txt || true
 
-# clone OneForAll
-if [ ! -d "/usr/src/github/OneForAll" ]
-then
-  echo "Cloning OneForAll"
-  git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
-fi
-python3 -m pip install -r /usr/src/github/OneForAll/requirements.txt || true
+  # clone OneForAll
+  if [ ! -d "/usr/src/github/OneForAll" ]
+  then
+    echo "Cloning OneForAll"
+    timeout 60 git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll || true
+  fi
+  python3 -m pip install $PIP_NETWORK_FLAGS -r /usr/src/github/OneForAll/requirements.txt || true
 
-# clone eyewitness
-if [ ! -d "/usr/src/github/EyeWitness" ]
-then
-  echo "Cloning EyeWitness"
-  git clone https://github.com/FortyNorthSecurity/EyeWitness /usr/src/github/EyeWitness
-  # pip install -r /usr/src/github/Eyewitness/requirements.txt
-fi
+  # clone eyewitness
+  if [ ! -d "/usr/src/github/EyeWitness" ]
+  then
+    echo "Cloning EyeWitness"
+    timeout 60 git clone https://github.com/FortyNorthSecurity/EyeWitness /usr/src/github/EyeWitness || true
+  fi
 
-# clone theHarvester
-if [ ! -d "/usr/src/github/theHarvester" ]
-then
-  echo "Cloning theHarvester"
-  git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
-fi
-# theHarvester changed their repo structure - try multiple possible requirement paths
-if [ -f "/usr/src/github/theHarvester/requirements/base.txt" ]; then
-  python3 -m pip install -r /usr/src/github/theHarvester/requirements/base.txt || true
-elif [ -f "/usr/src/github/theHarvester/requirements.txt" ]; then
-  python3 -m pip install -r /usr/src/github/theHarvester/requirements.txt || true
+  # clone theHarvester
+  if [ ! -d "/usr/src/github/theHarvester" ]
+  then
+    echo "Cloning theHarvester"
+    timeout 60 git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester || true
+  fi
+  # theHarvester changed their repo structure - try multiple possible requirement paths
+  if [ -f "/usr/src/github/theHarvester/requirements/base.txt" ]; then
+    python3 -m pip install $PIP_NETWORK_FLAGS -r /usr/src/github/theHarvester/requirements/base.txt || true
+  elif [ -f "/usr/src/github/theHarvester/requirements.txt" ]; then
+    python3 -m pip install $PIP_NETWORK_FLAGS -r /usr/src/github/theHarvester/requirements.txt || true
+  else
+    echo "WARNING: theHarvester requirements file not found, skipping installation"
+  fi
 else
-  echo "WARNING: theHarvester requirements file not found, skipping installation"
-  echo "Available files in theHarvester: $(ls /usr/src/github/theHarvester/ 2>/dev/null || echo 'directory not found')"
+  echo "Skipping tool cloning/installation (no network)"
 fi
 
 # clone vulscan
-if [ ! -d "/usr/src/github/scipag_vulscan" ]
-then
-  echo "Cloning Nmap Vulscan script"
-  git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan
-  echo "Symlinking to nmap script dir"
-  ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan
-  echo "Usage in reNgine, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
-fi
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  if [ ! -d "/usr/src/github/scipag_vulscan" ]
+  then
+    echo "Cloning Nmap Vulscan script"
+    timeout 60 git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan || true
+    echo "Symlinking to nmap script dir"
+    ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan || true
+    echo "Usage in reNgine, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
+  fi
 
-# install h8mail
-python3 -m pip install h8mail || true
+  # install h8mail
+  python3 -m pip install $PIP_NETWORK_FLAGS h8mail || true
 
-# install gf patterns
-if [ ! -d "/root/Gf-Patterns" ];
-then
-  echo "Installing GF Patterns"
-  mkdir ~/.gf
-  cp -r $GOPATH/src/github.com/tomnomnom/gf/examples/*.json ~/.gf
-  git clone https://github.com/1ndianl33t/Gf-Patterns ~/Gf-Patterns
-  mv ~/Gf-Patterns/*.json ~/.gf
+  # install gf patterns
+  if [ ! -d "/root/Gf-Patterns" ];
+  then
+    echo "Installing GF Patterns"
+    mkdir -p ~/.gf
+    cp -r $GOPATH/src/github.com/tomnomnom/gf/examples/*.json ~/.gf 2>/dev/null || true
+    timeout 60 git clone https://github.com/1ndianl33t/Gf-Patterns ~/Gf-Patterns || true
+    mv ~/Gf-Patterns/*.json ~/.gf 2>/dev/null || true
+  fi
+else
+  echo "Skipping vulscan/h8mail/gf-patterns install (no network)"
 fi
 
 # store scan_results
@@ -143,42 +172,46 @@ fi
 naabu && subfinder && amass || true
 nuclei || true
 
-if [ ! -d "/root/nuclei-templates/geeknik_nuclei_templates" ];
-then
-  echo "Installing Geeknik Nuclei templates"
-  git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  if [ ! -d "/root/nuclei-templates/geeknik_nuclei_templates" ];
+  then
+    echo "Installing Geeknik Nuclei templates"
+    timeout 60 git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates || true
+  else
+    echo "Removing old Geeknik Nuclei templates and updating new one"
+    rm -rf ~/nuclei-templates/geeknik_nuclei_templates
+    timeout 60 git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates || true
+  fi
+
+  if [ ! -f ~/nuclei-templates/ssrf_nagli.yaml ];
+  then
+    echo "Downloading ssrf_nagli for Nuclei"
+    timeout 30 wget https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml -O ~/nuclei-templates/ssrf_nagli.yaml || true
+  fi
+
+  if [ ! -d "/usr/src/github/CMSeeK" ]
+  then
+    echo "Cloning CMSeeK"
+    timeout 60 git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK || true
+    pip install $PIP_NETWORK_FLAGS -r /usr/src/github/CMSeeK/requirements.txt || true
+  fi
+
+  # clone ctfr
+  if [ ! -d "/usr/src/github/ctfr" ]
+  then
+    echo "Cloning CTFR"
+    timeout 60 git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr || true
+  fi
+
+  # clone gooFuzz
+  if [ ! -d "/usr/src/github/goofuzz" ]
+  then
+    echo "Cloning GooFuzz"
+    timeout 60 git clone https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz || true
+    chmod +x /usr/src/github/goofuzz/GooFuzz 2>/dev/null || true
+  fi
 else
-  echo "Removing old Geeknik Nuclei templates and updating new one"
-  rm -rf ~/nuclei-templates/geeknik_nuclei_templates
-  git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates
-fi
-
-if [ ! -f ~/nuclei-templates/ssrf_nagli.yaml ];
-then
-  echo "Downloading ssrf_nagli for Nuclei"
-  wget https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml -O ~/nuclei-templates/ssrf_nagli.yaml
-fi
-
-if [ ! -d "/usr/src/github/CMSeeK" ]
-then
-  echo "Cloning CMSeeK"
-  git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
-  pip install -r /usr/src/github/CMSeeK/requirements.txt
-fi
-
-# clone ctfr
-if [ ! -d "/usr/src/github/ctfr" ]
-then
-  echo "Cloning CTFR"
-  git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
-fi
-
-# clone gooFuzz
-if [ ! -d "/usr/src/github/goofuzz" ]
-then
-  echo "Cloning GooFuzz"
-  git clone https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz
-  chmod +x /usr/src/github/goofuzz/GooFuzz
+  echo "Skipping nuclei templates/CMSeeK/ctfr/goofuzz install (no network)"
 fi
 
 # httpx seems to have issue, use alias instead!!!
@@ -188,7 +221,9 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 #python3 -m pip uninstall -y httpcore
 
 # TEMPORARY FIX FOR langchain
-pip install tenacity==8.2.2 || true
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  pip install $PIP_NETWORK_FLAGS tenacity==8.2.2 || true
+fi
 
 loglevel='info'
 if [ "$DEBUG" == "1" ]; then
