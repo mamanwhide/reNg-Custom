@@ -35,6 +35,7 @@ from reNgine.security import (
 	validate_domain, sanitize_domain, validate_url,
 	sanitize_shell_arg, is_safe_path,
 )
+from dashboard.models import OllamaSettings
 from scanEngine.models import (EngineType, InstalledExternalTool, Notification, Proxy)
 from startScan.models import *
 from startScan.models import EndPoint, Subdomain, Vulnerability
@@ -2387,11 +2388,13 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 		}
 		self.notify(fields=fields)
 
-	# after vulnerability scan is done, we need to run gpt if
-	# should_fetch_gpt_report and openapi key exists
+	# after vulnerability scan is done, we need to run LLM report if
+	# should_fetch_gpt_report and either OpenAI key exists or Ollama is enabled
+	ollama_settings = OllamaSettings.objects.first()
+	use_ollama = ollama_settings and ollama_settings.use_ollama
 
-	if should_fetch_gpt_report and OpenAiAPIKey.objects.all().first():
-		logger.info('Getting Vulnerability GPT Report')
+	if should_fetch_gpt_report and (OpenAiAPIKey.objects.all().first() or use_ollama):
+		logger.info('Getting Vulnerability LLM Report')
 		vulns = Vulnerability.objects.filter(
 			scan_history__id=self.scan_id
 		).filter(
@@ -2448,14 +2451,19 @@ def get_vulnerability_gpt_report(vuln):
 			path
 		)
 		response = report.get_vulnerability_description(vulnerability_description)
-		add_gpt_description_db(
-			title,
-			path,
-			response.get('description'),
-			response.get('impact'),
-			response.get('remediation'),
-			response.get('references', [])
-		)
+		# Only save to DB if we got a valid response with actual content
+		if response.get('status') and response.get('description'):
+			add_gpt_description_db(
+				title,
+				path,
+				response.get('description'),
+				response.get('impact'),
+				response.get('remediation'),
+				response.get('references', [])
+			)
+		else:
+			logger.warning(f'LLM failed for {title}: {response.get("error", "unknown error")}')
+			return
 
 
 	for vuln in Vulnerability.objects.filter(name=title, http_url__icontains=path):
@@ -2741,11 +2749,13 @@ def dalfox_xss_scan(self, urls=None, ctx=None, description=None):
 		if not vuln:
 			continue
 
-	# after vulnerability scan is done, we need to run gpt if
-	# should_fetch_gpt_report and openapi key exists
+	# after vulnerability scan is done, we need to run LLM report if
+	# should_fetch_gpt_report and either OpenAI key exists or Ollama is enabled
+	ollama_settings = OllamaSettings.objects.first()
+	use_ollama = ollama_settings and ollama_settings.use_ollama
 
-	if should_fetch_gpt_report and OpenAiAPIKey.objects.all().first():
-		logger.info('Getting Dalfox Vulnerability GPT Report')
+	if should_fetch_gpt_report and (OpenAiAPIKey.objects.all().first() or use_ollama):
+		logger.info('Getting Dalfox Vulnerability LLM Report')
 		vulns = Vulnerability.objects.filter(
 			scan_history__id=self.scan_id
 		).filter(
@@ -2875,11 +2885,13 @@ def crlfuzz_scan(self, urls=None, ctx=None, description=None):
 		if not vuln:
 			continue
 
-	# after vulnerability scan is done, we need to run gpt if
-	# should_fetch_gpt_report and openapi key exists
+	# after vulnerability scan is done, we need to run LLM report if
+	# should_fetch_gpt_report and either OpenAI key exists or Ollama is enabled
+	ollama_settings = OllamaSettings.objects.first()
+	use_ollama = ollama_settings and ollama_settings.use_ollama
 
-	if should_fetch_gpt_report and OpenAiAPIKey.objects.all().first():
-		logger.info('Getting CRLFuzz Vulnerability GPT Report')
+	if should_fetch_gpt_report and (OpenAiAPIKey.objects.all().first() or use_ollama):
+		logger.info('Getting CRLFuzz Vulnerability LLM Report')
 		vulns = Vulnerability.objects.filter(
 			scan_history__id=self.scan_id
 		).filter(
@@ -4858,14 +4870,19 @@ def llm_vulnerability_description(vulnerability_id):
 		gpt_generator = LLMVulnerabilityReportGenerator(logger=logger)
 		response = gpt_generator.get_vulnerability_description(vulnerability_description)
 		logger.info(response)
-		add_gpt_description_db(
-			lookup_vulnerability.name,
-			path,
-			response.get('description'),
-			response.get('impact'),
-			response.get('remediation'),
-			response.get('references', [])
-		)
+		# Only save to DB if we got a valid response with actual content
+		if response.get('status') and response.get('description'):
+			add_gpt_description_db(
+				lookup_vulnerability.name,
+				path,
+				response.get('description'),
+				response.get('impact'),
+				response.get('remediation'),
+				response.get('references', [])
+			)
+		else:
+			logger.warning(f'LLM failed for {lookup_vulnerability.name}: {response.get("error", "unknown error")}')
+			return response
 
 	# for all vulnerabilities with the same vulnerability name this description has to be stored.
 	# also the condition is that the url must contain a part of this.

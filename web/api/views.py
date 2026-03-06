@@ -473,7 +473,13 @@ class LLMVulnerabilityReportView(APIView):
 				'error': 'Missing GET param Vulnerability `id`'
 			})
 		task = llm_vulnerability_description.apply_async(args=(vulnerability_id,))
-		response = task.wait()
+		try:
+			response = task.wait(timeout=600)
+		except Exception as e:
+			return Response({
+				'status': False,
+				'error': f'LLM task timed out or failed: {str(e)}'
+			})
 		return Response(response)
 
 

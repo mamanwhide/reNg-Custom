@@ -1130,23 +1130,23 @@ def parse_llm_vulnerability_report(report):
 	data = {}
 	sections = re.split(r'\n(?=(?:Description|Impact|Remediation|References):)', report.strip())
 	
-	try:
-		for section in sections:
-			if not section.strip():
-				continue
-			
+	for section in sections:
+		if not section.strip():
+			continue
+		try:
 			section_title, content = re.split(r':\n', section.strip(), maxsplit=1)
-			
-			if section_title == 'Description':
-				data['description'] = content.strip()
-			elif section_title == 'Impact':
-				data['impact'] = content.strip()
-			elif section_title == 'Remediation':
-				data['remediation'] = content.strip()
-			elif section_title == 'References':
-				data['references'] = [ref.strip() for ref in content.split('\n') if ref.strip()]
-	except Exception as e:
-		return data
+		except ValueError:
+			# Section doesn't match "Title:\ncontent" format (e.g. preamble), skip it
+			continue
+		
+		if section_title == 'Description':
+			data['description'] = content.strip()
+		elif section_title == 'Impact':
+			data['impact'] = content.strip()
+		elif section_title == 'Remediation':
+			data['remediation'] = content.strip()
+		elif section_title == 'References':
+			data['references'] = [ref.strip() for ref in content.split('\n') if ref.strip()]
 	
 	return data
 

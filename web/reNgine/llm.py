@@ -36,12 +36,19 @@ class LLMVulnerabilityReportGenerator:
 			prompt = VULNERABILITY_DESCRIPTION_SYSTEM_MESSAGE + "\nUser: " + description
 			prompt = re.sub(r'\t', '', prompt)
 			self.logger.info(f"Using Ollama for Vulnerability Description Generation")
-			llm = Ollama(
-				base_url=OLLAMA_INSTANCE, 
-				model=self.model_name
-			)
-			response_content = llm.invoke(prompt)
-			# self.logger.info(response_content)
+			try:
+				llm = Ollama(
+					base_url=OLLAMA_INSTANCE, 
+					model=self.model_name,
+					timeout=600,
+				)
+				response_content = llm.invoke(prompt)
+			except Exception as e:
+				self.logger.error(f"Ollama error: {e}")
+				return {
+					'status': False,
+					'error': f'Ollama error: {str(e)}'
+				}
 		else:
 			self.logger.info(f'Using OpenAI API for Vulnerability Description Generation')
 			openai_api_key = get_open_ai_key()
@@ -103,12 +110,21 @@ class LLMAttackSuggestionGenerator:
 			self.logger.info(f"Using Ollama for Attack Suggestion Generation")
 			prompt = ATTACK_SUGGESTION_GPT_SYSTEM_PROMPT + "\nUser: " + user_input	
 			prompt = re.sub(r'\t', '', prompt)
-			llm = Ollama(
-				base_url=OLLAMA_INSTANCE, 
-				model=self.model_name
-			)
-			response_content = llm.invoke(prompt)
-			self.logger.info(response_content)
+			try:
+				llm = Ollama(
+					base_url=OLLAMA_INSTANCE, 
+					model=self.model_name,
+					timeout=600
+				)
+				response_content = llm.invoke(prompt)
+				self.logger.info(response_content)
+			except Exception as e:
+				self.logger.error(f"Ollama attack suggestion error: {e}")
+				return {
+					'status': False,
+					'error': f'Ollama error: {str(e)}',
+					'input': user_input
+				}
 		else:
 			self.logger.info(f'Using OpenAI API for Attack Suggestion Generation')
 			openai_api_key = get_open_ai_key()

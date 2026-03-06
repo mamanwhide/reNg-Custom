@@ -61,7 +61,7 @@ Detailed documentation available at [https://rengine.wiki](https://rengine.wiki)
 * [About reNgine](#about-rengine)
 * [Workflow](#workflow)
 * [Features](#features)
-* [Security Hardening and Bug Fixes](#security-hardening-and-bug-fixes)
+* [Security Hardening, Bug Fixes & Functional Improvements](#security-hardening-bug-fixes--functional-improvements)
 * [Enterprise Support](#enterprise-support)
 * [Quick Installation](#quick-installation)
 * [Installation Video](#installation-video-tutorial)
@@ -168,11 +168,11 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-## Security Hardening and Bug Fixes
+## Security Hardening, Bug Fixes & Functional Improvements
 
-A comprehensive security audit was conducted across 20 core source files covering the orchestration flow, external tool integrations, dashboard data layer, and REST API. All identified findings have been remediated and verified. Full details are available in `RENGINE_DEEP_AUDIT_V2.md`.
+A comprehensive security audit was conducted across 20 core source files covering the orchestration flow, external tool integrations, dashboard data layer, and REST API. In addition to security hardening, numerous functional bug fixes, infrastructure improvements, and deployment optimizations have been applied. Full security audit details are available in `RENGINE_DEEP_AUDIT_V2.md`.
 
-### Summary
+### Security Audit Summary
 
 | Severity | Findings | Status |
 |----------|----------|--------|
@@ -261,6 +261,46 @@ Entrypoint scripts (`entrypoint.sh`, `celery-entrypoint.sh`, `beat-entrypoint.sh
 - Backwards-compatible `gosu` detection (graceful fallback if not installed)
 - Automatic `tenacity` dependency upgrade for `langchain_core` compatibility
 - Non-root user execution via `gosu rengine` when available
+
+### Functional Bug Fixes
+
+| Issue | Root Cause | Fix | File(s) |
+|-------|-----------|-----|----------|
+| DataTables Ajax 400 error on large queries | Gunicorn default `limit-request-line` (8190 bytes) rejecting long query strings | Made `limit-request-line` configurable via `GUNICORN_LIMIT_REQUEST_LINE` env var (default 8190). Added `large_client_header_buffers 4 16k` to Nginx. | `entrypoint.sh`, `rengine.conf` |
+| VulnerabilityViewSet / EndPointViewSet crash | `search_value` was `None` when DataTables sent empty search, causing `AttributeError` on `.strip()` | Added `search_value = search_value or ''` guard before string operations | `api/views.py` |
+| Report generation 500 error | `pydyf>=0.12.0` broke `weasyprint==53.3` with `TypeError` on `Stream.compress()` | Pinned `pydyf>=0.5.0,<0.12.0` in `requirements.txt` | `requirements.txt` |
+| OpenAI SDK `module has no attribute 'OpenAI'` | `openai==0.28.0` used legacy API; code already used new `openai.OpenAI()` client pattern | Upgraded to `openai>=1.3.0,<2.0.0` | `requirements.txt` |
+| Scans stuck in RUNNING state indefinitely | Celery tasks completed but `ScanHistory` status not updated on certain error paths | Reset stuck tasks to SUCCESS, fixed status update logic | `tasks.py` |
+
+### LLM / Ollama Integration Improvements
+
+| Issue | Root Cause | Fix | File(s) |
+|-------|-----------|-----|----------|
+| Vulnerability descriptions never generated with Ollama | `fetch_gpt_report` set to `false` in Full Scan engine YAML | Updated default engine configuration to `fetch_gpt_report: true` | Database (EngineType) |
+| LLM report gatekeeper ignored Ollama | Three gatekeeper conditions only checked `OpenAiAPIKey`, blocking Ollama-only setups | Changed all 3 conditions (Nuclei, Dalfox, CRLFuzz) to: `if should_fetch_gpt_report and (OpenAiAPIKey or use_ollama)` | `tasks.py` |
+| Class name collision `LLMVulnerabilityReportGenerator` | API view class and LLM generator class had identical names | Renamed API view to `LLMVulnerabilityReportView` | `api/views.py`, `api/urls.py` |
+
+### Infrastructure & Deployment
+
+| Improvement | Description | File(s) |
+|-------------|-------------|----------|
+| 502 proxy race condition | Nginx started before Gunicorn was ready on first boot. Added healthcheck to web service and `depends_on: condition: service_healthy` for proxy. | `docker-compose.yml` |
+| Network binding unification | All service bindings (`db:5432`, `web:8000`, `ollama:11434`) unified to `0.0.0.0` for consistent LAN accessibility. | `docker-compose.yml`, `docker-compose.dev.yml` |
+| `ALLOWED_HOSTS` configurable | Changed from hardcoded list to `env.list('ALLOWED_HOSTS', default=['*'])` for easy LAN/VPN deployment. | `settings.py` |
+| Gunicorn request line limit | Made configurable via `GUNICORN_LIMIT_REQUEST_LINE` environment variable with sensible default. | `entrypoint.sh` |
+
+### Celery Entrypoint Network Resilience
+
+The `celery-entrypoint.sh` script performs ~15 network operations (git clone, pip install, wget, apt install) before starting workers. In VPN-only or air-gapped environments where external DNS is unavailable, this caused multi-hour startup delays or complete failure.
+
+Fixes applied:
+
+- Added `NETWORK_AVAILABLE` check at startup (DNS resolution test with 5-second timeout)
+- All network-dependent blocks (Firefox install, wordlist downloads, tool cloning, pip installs, Nuclei templates) wrapped in `if [ "$NETWORK_AVAILABLE" = true ]` conditionals
+- Added `--retries 1 --timeout 15` flags to all pip commands
+- Added `timeout 30/60` to wget and git clone commands
+- When no network: logs "Skipping..." messages and proceeds directly to starting Celery workers
+- Workers now start in ~10 seconds instead of hanging indefinitely in offline environments
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
