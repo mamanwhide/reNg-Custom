@@ -203,12 +203,21 @@ if [ "$NETWORK_AVAILABLE" = true ]; then
     timeout 60 git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr || true
   fi
 
-  # clone gooFuzz
+  # clone gooFuzz (pinned to v1.2.6 — v2.0 requires Google Custom Search API keys)
   if [ ! -d "/usr/src/github/goofuzz" ]
   then
-    echo "Cloning GooFuzz"
-    timeout 60 git clone https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz || true
+    echo "Cloning GooFuzz v1.2.6"
+    timeout 60 git clone --branch 1.2.6 --depth 1 https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz || true
     chmod +x /usr/src/github/goofuzz/GooFuzz 2>/dev/null || true
+  else
+    # If already cloned, ensure we're on v1.2.6 (not v2.0 which needs API keys)
+    GOOFUZZ_VERSION=$(cd /usr/src/github/goofuzz && grep -m1 'version=' GooFuzz 2>/dev/null | grep -oP '\"[0-9.]+\"' | tr -d '"')
+    if [ "$GOOFUZZ_VERSION" = "2.0" ]; then
+      echo "GooFuzz v2.0 detected, downgrading to v1.2.6..."
+      rm -rf /usr/src/github/goofuzz
+      timeout 60 git clone --branch 1.2.6 --depth 1 https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz || true
+      chmod +x /usr/src/github/goofuzz/GooFuzz 2>/dev/null || true
+    fi
   fi
 else
   echo "Skipping nuclei templates/CMSeeK/ctfr/goofuzz install (no network)"

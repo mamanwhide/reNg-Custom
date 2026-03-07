@@ -33,7 +33,7 @@ RUN apt update -y && \
     python3-pip 
 
 # Install essential packages
-RUN apt install -y --no-install-recommends \
+RUN apt-get update -y && apt install -y --no-install-recommends \
     build-essential \
     cmake \
     geoip-bin \
@@ -46,6 +46,7 @@ RUN apt install -y --no-install-recommends \
     libpangoft2-1.0-0 \
     libpcap-dev \
     netcat \
+    jq \
     nmap \
     x11-utils \
     xvfb \
