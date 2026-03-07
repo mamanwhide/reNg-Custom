@@ -20,10 +20,8 @@ fi
 # Common pip flags to prevent long retries when network is flaky
 PIP_NETWORK_FLAGS="--retries 1 --timeout 15"
 
-# Fix dependency compatibility issues (needed for older images)
-if [ "$NETWORK_AVAILABLE" = true ]; then
-  pip3 install --quiet $PIP_NETWORK_FLAGS tenacity 2>/dev/null || true
-fi
+# NOTE: tenacity upgrade is done AFTER all tool installations below
+# (theHarvester pins tenacity==8.0.1 which would overwrite an early upgrade)
 
 # Wait for web container to finish migrations instead of running them concurrently
 echo "Waiting for database migrations to be applied by web container..."
@@ -161,7 +159,7 @@ if [ "$NETWORK_AVAILABLE" = true ]; then
 else
   echo "Skipping vulscan/h8mail/gf-patterns install (no network)"
 fi
-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30
+
 # store scan_results
 if [ ! -d "/usr/src/scan_results" ]
 then
@@ -225,7 +223,11 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 # TEMPORARY FIX, httpcore is causing issues with celery, removing it as temp fix
 #python3 -m pip uninstall -y httpcore
 
-# tenacity is already installed above; no version downgrade needed
+# Fix tenacity version: langchain_core needs >=8.2.3, but theHarvester pins 8.0.1.
+# Must run AFTER all tool installations to avoid being overwritten.
+if [ "$NETWORK_AVAILABLE" = true ]; then
+  pip3 install --quiet --upgrade $PIP_NETWORK_FLAGS 'tenacity>=8.2.3,!=8.4.0,<9.0.0' 2>/dev/null || true
+fi
 
 loglevel='info'
 if [ "$DEBUG" == "1" ]; then
