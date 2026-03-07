@@ -3,6 +3,7 @@ import json
 import os
 import pprint
 import subprocess
+import random
 import time
 import validators
 import xmltodict
@@ -774,18 +775,8 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 		# 		})
 		# 		meta_info.append(save_metadata_info(meta_dict))
 
-	grouped_tasks = []
-
-	if 'emails' in osint_lookup:
-		_task = h8mail.si(
-			config=config,
-			host=host,
-			scan_history_id=scan_history_id,
-			activity_id=activity_id,
-			results_dir=results_dir,
-			ctx=ctx
-		)
-		grouped_tasks.append(_task)
+	# theHarvester must run BEFORE h8mail — theHarvester writes emails.txt which h8mail reads
+	chain_tasks = []
 
 	if 'employees' in osint_lookup:
 		ctx['track'] = False
@@ -797,15 +788,26 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 			results_dir=results_dir,
 			ctx=ctx
 		)
-		grouped_tasks.append(_task)
+		chain_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-	# MED-06 fix: Use job.get() instead of busy-wait polling
-	try:
-		job.get(timeout=3600, interval=5)
-	except Exception as e:
-		logger.error(f'OSINT discovery tasks error or timeout: {e}')
+	if 'emails' in osint_lookup:
+		_task = h8mail.si(
+			config=config,
+			host=host,
+			scan_history_id=scan_history_id,
+			activity_id=activity_id,
+			results_dir=results_dir,
+			ctx=ctx
+		)
+		chain_tasks.append(_task)
+
+	if chain_tasks:
+		job = (chain(*chain_tasks) if len(chain_tasks) > 1 else chain_tasks[0]).apply_async()
+		# MED-06 fix: Use job.get() instead of busy-wait polling
+		try:
+			job.get(timeout=3600, interval=5)
+		except Exception as e:
+			logger.error(f'OSINT discovery tasks error or timeout: {e}')
 
 	# results['emails'] = results.get('emails', []) + emails
 	# results['creds'] = creds
@@ -858,7 +860,11 @@ def dorking(config, host, scan_history_id, results_dir):
 
 	# default dorking
 	try:
-		for dork in dorks:
+		for _dork_idx, dork in enumerate(dorks):
+			if _dork_idx > 0:
+				_wait = random.randint(8, 15)
+				logger.info(f'Dorking: sleeping {_wait}s between dork types to avoid Google rate-limit')
+				time.sleep(_wait)
 			logger.info(f'Getting dork information for {dork}')
 			if dork == 'stackoverflow':
 				results = get_and_save_dork_results(
@@ -907,7 +913,9 @@ def dorking(config, host, scan_history_id, results_dir):
 					'youtube.com',
 					'reddit.com'
 				]
-				for site in social_websites:
+				for _si, site in enumerate(social_websites):
+					if _si > 0:
+						time.sleep(random.randint(5, 10))
 					results = get_and_save_dork_results(
 						lookup_target=site,
 						results_dir=results_dir,
@@ -921,7 +929,9 @@ def dorking(config, host, scan_history_id, results_dir):
 					'trello.com',
 					'atlassian.net'
 				]
-				for site in project_websites:
+				for _pi, site in enumerate(project_websites):
+					if _pi > 0:
+						time.sleep(random.randint(5, 10))
 					results = get_and_save_dork_results(
 						lookup_target=site,
 						results_dir=results_dir,
@@ -936,7 +946,9 @@ def dorking(config, host, scan_history_id, results_dir):
 					'gitlab.com',
 					'bitbucket.org'
 				]
-				for site in project_websites:
+				for _ci, site in enumerate(project_websites):
+					if _ci > 0:
+						time.sleep(random.randint(5, 10))
 					results = get_and_save_dork_results(
 						lookup_target=site,
 						results_dir=results_dir,
@@ -996,21 +1008,6 @@ def dorking(config, host, scan_history_id, results_dir):
 				)
 
 			elif dork == 'php_error' :
-				lookup_keywords = [
-					'PHP Parse error',
-					'PHP Warning',
-					'PHP Error'
-				]
-				results = get_and_save_dork_results(
-					lookup_target=host,
-					results_dir=results_dir,
-					type=dork,
-					lookup_keywords=','.join(lookup_keywords),
-					page_count=5,
-					scan_history=scan_history
-				)
-
-			elif dork == 'jenkins' :
 				lookup_keywords = [
 					'PHP Parse error',
 					'PHP Warning',
@@ -1135,15 +1132,33 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx=No
 		logger.error(f'Could not open {output_path_json}')
 		return {}
 
-	# Load theHarvester results
+	# Load theHarvester results — handle null/empty output gracefully
 	with open(output_path_json, 'r') as f:
-		data = json.load(f)
+		raw = f.read().strip()
+	if not raw or raw in ('null', '[]', '{}', 'None'):
+		logger.warning(f'theHarvester returned no results for {host}')
+		return {}
+	try:
+		data = json.loads(raw)
+	except json.JSONDecodeError as e:
+		logger.error(f'theHarvester JSON parse error: {e}')
+		return {}
+	if not data or not isinstance(data, dict):
+		logger.warning(f'theHarvester returned unexpected data type for {host}')
+		return {}
 
 	# Re-indent theHarvester JSON
 	with open(output_path_json, 'w') as f:
 		json.dump(data, f, indent=4)
 
 	emails = data.get('emails', [])
+	# Write emails.txt so h8mail can consume it after this task completes
+	emails_file = f'{results_dir}/emails.txt'
+	with open(emails_file, 'w') as ef:
+		for addr in emails:
+			ef.write(addr + '\n')
+	logger.info(f'theHarvester: wrote {len(emails)} email(s) to {emails_file}')
+
 	for email_address in emails:
 		email, _ = save_email(email_address, scan_history=scan_history)
 		# if email:
@@ -1225,19 +1240,32 @@ def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx=None):
 	scan_history = ScanHistory.objects.get(pk=scan_history_id)
 	input_path = f'{results_dir}/emails.txt'
 	output_file = f'{results_dir}/h8mail.json'
-
-	cmd = f'h8mail -t {input_path} --json {output_file}'
 	history_file = f'{results_dir}/commands.txt'
 
+	# Skip if emails.txt is missing or empty (theHarvester found no emails)
+	if not os.path.isfile(input_path) or os.path.getsize(input_path) == 0:
+		logger.warning(f'h8mail: {input_path} is empty or missing — skipping credential check')
+		return []
+
+	cmd = f'h8mail -t {input_path} --json {output_file}'
 	run_command(
 		cmd,
 		history_file=history_file,
 		scan_id=scan_history_id,
 		activity_id=activity_id)
 
-	with open(output_file) as f:
-		data = json.load(f)
-		creds = data.get('targets', [])
+	if not os.path.isfile(output_file):
+		logger.warning('h8mail: output file not created — no breach results')
+		return []
+
+	try:
+		with open(output_file) as f:
+			data = json.load(f)
+	except (json.JSONDecodeError, OSError) as e:
+		logger.error(f'h8mail: failed to parse output: {e}')
+		return []
+
+	creds = data.get('targets', [])
 
 	# TODO: go through h8mail output and save emails to DB
 	for cred in creds:
@@ -4392,7 +4420,7 @@ def extract_httpx_url(line):
 # OSInt utils #
 #-------------#
 
-def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=None, lookup_extensions=None, delay=3, page_count=2, scan_history=None):
+def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=None, lookup_extensions=None, delay=5, page_count=2, scan_history=None):
 	"""
 		Uses gofuzz to dork and store information
 

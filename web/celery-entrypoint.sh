@@ -22,7 +22,7 @@ PIP_NETWORK_FLAGS="--retries 1 --timeout 15"
 
 # Fix dependency compatibility issues (needed for older images)
 if [ "$NETWORK_AVAILABLE" = true ]; then
-  pip3 install --quiet --upgrade $PIP_NETWORK_FLAGS tenacity 2>/dev/null || true
+  pip3 install --quiet $PIP_NETWORK_FLAGS tenacity 2>/dev/null || true
 fi
 
 # Wait for web container to finish migrations instead of running them concurrently
@@ -177,10 +177,6 @@ if [ "$NETWORK_AVAILABLE" = true ]; then
   then
     echo "Installing Geeknik Nuclei templates"
     timeout 60 git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates || true
-  else
-    echo "Removing old Geeknik Nuclei templates and updating new one"
-    rm -rf ~/nuclei-templates/geeknik_nuclei_templates
-    timeout 60 git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates || true
   fi
 
   if [ ! -f ~/nuclei-templates/ssrf_nagli.yaml ];
@@ -229,10 +225,7 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 # TEMPORARY FIX, httpcore is causing issues with celery, removing it as temp fix
 #python3 -m pip uninstall -y httpcore
 
-# TEMPORARY FIX FOR langchain
-if [ "$NETWORK_AVAILABLE" = true ]; then
-  pip install $PIP_NETWORK_FLAGS tenacity==8.2.2 || true
-fi
+# tenacity is already installed above; no version downgrade needed
 
 loglevel='info'
 if [ "$DEBUG" == "1" ]; then
