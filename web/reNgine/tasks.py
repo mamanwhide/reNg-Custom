@@ -1106,7 +1106,9 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx=No
 		logger.error(f'theHarvester: Invalid domain rejected: {repr(host[:100])}')
 		return {}
 	safe_host = sanitize_shell_arg(host)
-	cmd  = f'python3 {theHarvester_dir}/theHarvester.py -d {safe_host} -b all -f {output_path_json}'
+	# Use only free/reliable sources — '-b all' tries API-key sources that fail and produce null output
+	harvester_sources = 'anubis,certspotter,crtsh,dnsdumpster,hackertarget,otx,rapiddns,subdomaincenter,urlscan,yahoo'
+	cmd  = f'python3 {theHarvester_dir}/theHarvester.py -d {safe_host} -b {harvester_sources} -f {output_path_json}'
 
 	# Update proxies.yaml
 	proxy_query = Proxy.objects.all()
