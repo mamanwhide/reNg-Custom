@@ -168,6 +168,14 @@ def detail_scan(request, id, slug):
     # Emails
     exposed_count = emails.exclude(password__isnull=True).count()
 
+    # Screenshots: check if any subdomains have a screenshot regardless of engine task list
+    screenshot_count = (
+        subdomains
+        .exclude(screenshot_path__isnull=True)
+        .exclude(screenshot_path='')
+        .count()
+    )
+
     # Build render context
     ctx = {
         'scan_history_id': id,
@@ -199,6 +207,7 @@ def detail_scan(request, id, slug):
         'most_common_tags': common_tags,
         'most_common_vulnerability': common_vulns,
         'asset_countries': asset_countries,
+        'screenshot_count': screenshot_count,
     }
 
     # Find number of matched GF patterns

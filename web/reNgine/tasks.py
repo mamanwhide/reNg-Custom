@@ -48,6 +48,9 @@ Celery tasks.
 
 logger = get_task_logger(__name__)
 
+# Sentinel returned by get_and_save_dork_results() when Google blocks the IP.
+_GOOFUZZ_BLOCKED = object()
+
 
 #----------------------#
 # Scan / Subscan tasks #
@@ -837,6 +840,8 @@ def dorking(config, host, scan_history_id, results_dir):
 	dorks = config.get(OSINT_DORK, [])
 	custom_dorks = config.get(OSINT_CUSTOM_DORK, [])
 	results = []
+	google_blocked = False  # Track if Google has blocked this IP session
+
 	# custom dorking has higher priority
 	try:
 		for custom_dork in custom_dorks:
@@ -844,43 +849,54 @@ def dorking(config, host, scan_history_id, results_dir):
 			# replace with original host if _target_
 			lookup_target = host if lookup_target == '_target_' else lookup_target
 			if 'lookup_extensions' in custom_dork:
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=lookup_target,
 					results_dir=results_dir,
 					type='custom_dork',
 					lookup_extensions=custom_dork.get('lookup_extensions'),
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED:
+					google_blocked = True; break
+				results += res or []
 			elif 'lookup_keywords' in custom_dork:
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=lookup_target,
 					results_dir=results_dir,
 					type='custom_dork',
 					lookup_keywords=custom_dork.get('lookup_keywords'),
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED:
+					google_blocked = True; break
+				results += res or []
 	except Exception as e:
 		logger.exception(e)
 
 	# default dorking
 	try:
 		for _dork_idx, dork in enumerate(dorks):
+			if google_blocked:
+				logger.warning(f'Dorking: Google blocked — skipping remaining {len(dorks) - _dork_idx} dork types.')
+				break
 			if _dork_idx > 0:
 				_wait = random.randint(8, 15)
 				logger.info(f'Dorking: sleeping {_wait}s between dork types to avoid Google rate-limit')
 				time.sleep(_wait)
 			logger.info(f'Getting dork information for {dork}')
 			if dork == 'stackoverflow':
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target='stackoverflow.com',
 					results_dir=results_dir,
 					type=dork,
 					lookup_keywords=host,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True; continue
+				results += res or []
 
 			elif dork == 'login_pages':
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -888,9 +904,11 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=5,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True; continue
+				results += res or []
 
 			elif dork == 'admin_panels':
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -898,9 +916,11 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=5,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True; continue
+				results += res or []
 
 			elif dork == 'dashboard_pages':
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -908,6 +928,8 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=5,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True; continue
+				results += res or []
 
 			elif dork == 'social_media' :
 				social_websites = [
@@ -918,15 +940,20 @@ def dorking(config, host, scan_history_id, results_dir):
 					'reddit.com'
 				]
 				for _si, site in enumerate(social_websites):
+					if google_blocked:
+						break
 					if _si > 0:
 						time.sleep(random.randint(5, 10))
-					results = get_and_save_dork_results(
+					res = get_and_save_dork_results(
 						lookup_target=site,
 						results_dir=results_dir,
 						type=dork,
 						lookup_keywords=host,
 						scan_history=scan_history
 					)
+					if res is _GOOFUZZ_BLOCKED:
+						google_blocked = True; break
+					results += res or []
 
 			elif dork == 'project_management' :
 				project_websites = [
@@ -934,15 +961,20 @@ def dorking(config, host, scan_history_id, results_dir):
 					'atlassian.net'
 				]
 				for _pi, site in enumerate(project_websites):
+					if google_blocked:
+						break
 					if _pi > 0:
 						time.sleep(random.randint(5, 10))
-					results = get_and_save_dork_results(
+					res = get_and_save_dork_results(
 						lookup_target=site,
 						results_dir=results_dir,
 						type=dork,
 						lookup_keywords=host,
 						scan_history=scan_history
 					)
+					if res is _GOOFUZZ_BLOCKED:
+						google_blocked = True; break
+					results += res or []
 
 			elif dork == 'code_sharing' :
 				project_websites = [
@@ -951,15 +983,20 @@ def dorking(config, host, scan_history_id, results_dir):
 					'bitbucket.org'
 				]
 				for _ci, site in enumerate(project_websites):
+					if google_blocked:
+						break
 					if _ci > 0:
 						time.sleep(random.randint(5, 10))
-					results = get_and_save_dork_results(
+					res = get_and_save_dork_results(
 						lookup_target=site,
 						results_dir=results_dir,
 						type=dork,
 						lookup_keywords=host,
 						scan_history=scan_history
 					)
+					if res is _GOOFUZZ_BLOCKED:
+						google_blocked = True; break
+					results += res or []
 
 			elif dork == 'config_files' :
 				config_file_exts = [
@@ -977,7 +1014,7 @@ def dorking(config, host, scan_history_id, results_dir):
 					'cfg',
 					'ini'
 				]
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -985,10 +1022,12 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=4,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 			elif dork == 'jenkins' :
 				lookup_keyword = 'Jenkins'
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -996,13 +1035,15 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=1,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 			elif dork == 'wordpress_files' :
 				lookup_keywords = [
 					'/wp-content/',
 					'/wp-includes/'
 				]
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -1010,6 +1051,8 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=5,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 			elif dork == 'php_error' :
 				lookup_keywords = [
@@ -1017,7 +1060,7 @@ def dorking(config, host, scan_history_id, results_dir):
 					'PHP Warning',
 					'PHP Error'
 				]
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -1025,6 +1068,8 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=5,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 			elif dork == 'exposed_documents' :
 				docs_file_ext = [
@@ -1040,7 +1085,7 @@ def dorking(config, host, scan_history_id, results_dir):
 					'pps',
 					'csv'
 				]
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -1048,6 +1093,8 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=7,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 			elif dork == 'db_files' :
 				file_ext = [
@@ -1056,7 +1103,7 @@ def dorking(config, host, scan_history_id, results_dir):
 					'dbf',
 					'mdb'
 				]
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -1064,12 +1111,14 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=1,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 			elif dork == 'git_exposed' :
 				file_ext = [
 					'git',
 				]
-				results = get_and_save_dork_results(
+				res = get_and_save_dork_results(
 					lookup_target=host,
 					results_dir=results_dir,
 					type=dork,
@@ -1077,9 +1126,15 @@ def dorking(config, host, scan_history_id, results_dir):
 					page_count=1,
 					scan_history=scan_history
 				)
+				if res is _GOOFUZZ_BLOCKED: google_blocked = True
+				else: results += res or []
 
 	except Exception as e:
 		logger.exception(e)
+
+	if google_blocked:
+		logger.warning('dorking(): Google blocked this IP \u2014 dorking aborted early. Configure and enable proxies in Settings > Proxy to avoid blocks.')
+
 	return results
 
 
@@ -1111,7 +1166,8 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx=No
 		return {}
 	safe_host = sanitize_shell_arg(host)
 	# Use only free/reliable sources — '-b all' tries API-key sources that fail and produce null output
-	harvester_sources = 'anubis,certspotter,crtsh,dnsdumpster,hackertarget,otx,rapiddns,subdomaincenter,urlscan,yahoo'
+	# bing included as it provides Bing email/subdomain intel and acts as Google-independent fallback
+	harvester_sources = 'anubis,bing,certspotter,crtsh,dnsdumpster,hackertarget,otx,rapiddns,subdomaincenter,urlscan,yahoo'
 	cmd  = f'python3 {theHarvester_dir}/theHarvester.py -d {safe_host} -b {harvester_sources} -f {output_path_json}'
 
 	# Update proxies.yaml
@@ -4595,7 +4651,13 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 			delay (int): delay between each requests
 			page_count (int): pages in google to extract information
 			scan_history (startScan.ScanHistory): Scan History Object
+
+		Returns:
+			list | _GOOFUZZ_BLOCKED: list of dork URLs found, or the module-level
+			_GOOFUZZ_BLOCKED sentinel if Google blocked this IP.
 	"""
+	_BLOCK_SIGNAL = 'temporarily blocked your IP'
+
 	results = []
 	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t {lookup_target} -d {delay} -p {page_count}'
 	proxy = get_random_proxy()
@@ -4607,21 +4669,33 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 
 	if proxy:
 		gofuzz_command += f' -r {proxy}'
+		logger.debug(f'GooFuzz: using proxy {proxy}')
+	else:
+		logger.debug('GooFuzz: no proxy configured — running without proxy (risk of IP block)')
 
 	output_file = f'{results_dir}/gofuzz.txt'
 	gofuzz_command += f' -o {output_file}'
 	history_file = f'{results_dir}/commands.txt'
 
 	try:
-		run_command(
+		return_code, output = run_command(
 			gofuzz_command,
 			shell=False,
 			history_file=history_file,
 			scan_id=scan_history.id,
 		)
 
+		# Detect Google IP block via return code 1 or output message
+		combined_output = (output or '').lower()
+		if return_code == 1 or _BLOCK_SIGNAL.lower() in combined_output:
+			logger.warning(
+				f'GooFuzz IP blocked by Google (rc={return_code}, target={lookup_target}). '
+				'Add/enable a proxy in Settings → Proxy to avoid blocks.'
+			)
+			return _GOOFUZZ_BLOCKED
+
 		if not os.path.isfile(output_file):
-			return
+			return results
 
 		with open(output_file) as f:
 			for line in f.readlines():

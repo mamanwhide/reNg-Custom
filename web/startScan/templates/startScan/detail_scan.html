@@ -54,9 +54,9 @@ Scan Findings
 				<li class="nav-item recon-changes-tab-show" style="display: none">
 					<a class="nav-link" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#recon-changes-tab">Recon Data Changes</a>
 				</li>
-				{% if 'screenshot' in history.tasks %}
+				{% if 'screenshot' in history.tasks or screenshot_count > 0 %}
 				<li class="nav-item">
-					<a class="nav-link" id="pills-screenshot-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#screenshot-tab">Screenshots</a>
+					<a class="nav-link" id="pills-screenshot-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#screenshot-tab">Screenshots {% if screenshot_count > 0 %}<span class="badge bg-secondary">{{screenshot_count}}</span>{% endif %}</a>
 				</li>
 				{% endif %}
 				{% if 'dir_file_fuzz' in history.tasks %}
@@ -1007,7 +1007,7 @@ Scan Findings
 			</div>
 		</div>
 	</div>
-	{% if 'screenshot' in history.tasks %}
+	{% if 'screenshot' in history.tasks or screenshot_count > 0 %}
 	<div class="tab-pane" id="screenshot-tab">
 		<div class="col-lg-8 col-md-8 col-sm-9 filtered-list-search mx-auto">
 			<input type="text" class="form-control form-control-lg br-30 mb-3" id="screenshot-search" placeholder="">
@@ -2080,7 +2080,7 @@ $(document).ready(function() {
 		});
 	{% endif %}
 
-	{% if 'screenshot' in history.tasks %}
+	{% if 'screenshot' in history.tasks or screenshot_count > 0 %}
 		$("#pills-screenshot-tab").click(function() {
 			if($('#screenshots-table').children().length > 0) {
 				return false;
