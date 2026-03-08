@@ -712,9 +712,11 @@ def osint(self, host=None, ctx=None, description=None):
 
 	celery_group = group(grouped_tasks)
 	job = celery_group.apply_async()
-	# MED-06 fix: Use job.get() instead of busy-wait polling
+	# MED-06 fix: Use allow_join_result() to permit .get() inside a Celery 5 task.
+	# All sub-tasks run on separate queues so no deadlock risk.
 	try:
-		job.get(timeout=3600, interval=5)
+		with allow_join_result():
+			job.get(timeout=3600, interval=5)
 	except Exception as e:
 		logger.error(f'OSINT Tasks error or timeout: {e}')
 
@@ -803,9 +805,11 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 
 	if chain_tasks:
 		job = (chain(*chain_tasks) if len(chain_tasks) > 1 else chain_tasks[0]).apply_async()
-		# MED-06 fix: Use job.get() instead of busy-wait polling
+		# MED-06 fix: Use allow_join_result() to permit .get() inside a Celery 5 task.
+		# theHarvester runs on theHarvester_queue, h8mail on h8mail_queue — no deadlock risk.
 		try:
-			job.get(timeout=3600, interval=5)
+			with allow_join_result():
+				job.get(timeout=3600, interval=5)
 		except Exception as e:
 			logger.error(f'OSINT discovery tasks error or timeout: {e}')
 
@@ -4711,7 +4715,7 @@ def save_subdomain(subdomain_name, ctx=None):
 		validators.ipv6(subdomain_name)
 	)
 	if not valid_domain:
-		logger.error(f'{subdomain_name} is not an invalid domain. Skipping.')
+		logger.debug(f'{subdomain_name} is not a valid domain. Skipping.')
 		return None, False
 
 	if subdomain_checker.is_out_of_scope(subdomain_name):
