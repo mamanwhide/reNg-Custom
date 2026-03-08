@@ -241,6 +241,11 @@ urlpatterns = [
         ToggleBugBountyModeView.as_view(), 
         name='toggle_bug_bounty_mode'
     ),
+    path(
+        'action/fetch-free-proxies/',
+        FetchFreeProxies.as_view(),
+        name='fetch_free_proxies'
+    ),
 ]
 
 urlpatterns += router.urls

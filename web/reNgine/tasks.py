@@ -3238,6 +3238,162 @@ def http_crawl(
 # Notifications tasks #
 #---------------------#
 
+@app.task(name='fetch_free_proxies', bind=False, queue='main_scan_queue')
+def fetch_free_proxies(country_filter=None):
+	"""Fetch free HTTP/HTTPS proxies from multiple public sources and append
+	them to the reNgine Proxy settings object.
+
+	Sources:
+	  1. proxifly   — JSON CDN (reliable, no scraping)
+	  2. proxyscrape — plain-text API (reliable, no scraping)
+	  3. free-proxy-list.net — HTML table
+	  4. proxylistfree.com   — HTML table
+
+	Args:
+		country_filter (str|None): 2-letter ISO country code to filter proxies
+		    (e.g. 'ID' for Indonesia). None = all countries.
+
+	Returns:
+		dict: {'added': int, 'total': int} counts of newly added vs total proxies.
+	"""
+	import re as _re
+	import requests as _requests
+	from bs4 import BeautifulSoup
+
+	headers = {
+		'User-Agent': (
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+			'AppleWebKit/537.36 (KHTML, like Gecko) '
+			'Chrome/120.0.0.0 Safari/537.36'
+		)
+	}
+	country_filter = (country_filter or '').upper().strip() or None
+	collected = set()  # ip:port strings
+
+	def is_valid_proxy(ip, port):
+		"""Basic validation: IP format + port range."""
+		parts = ip.split('.')
+		if len(parts) != 4:
+			return False
+		try:
+			if not all(0 <= int(p) <= 255 for p in parts):
+				return False
+			port_int = int(port)
+			return 1 <= port_int <= 65535
+		except (ValueError, TypeError):
+			return False
+
+	# ── Source 1: proxifly JSON CDN ─────────────────────────────────────────
+	try:
+		url = 'https://cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/proxies/protocols/http/data.json'
+		r = _requests.get(url, headers=headers, timeout=20)
+		if r.ok:
+			data = r.json()
+			for entry in data:
+				ip = entry.get('ip', '')
+				port = str(entry.get('port', ''))
+				country = (entry.get('geolocation') or {}).get('country', '')
+				if country_filter and country != country_filter:
+					continue
+				if is_valid_proxy(ip, port):
+					collected.add(f'{ip}:{port}')
+			logger.info(f'fetch_free_proxies: proxifly gave {len(collected)} proxies')
+	except Exception as e:
+		logger.warning(f'fetch_free_proxies: proxifly failed: {e}')
+
+	before_src2 = len(collected)
+
+	# ── Source 2: proxyscrape plain-text API ────────────────────────────────
+	try:
+		country_param = f'&country={country_filter}' if country_filter else '&country=all'
+		url = (
+			f'https://api.proxyscrape.com/v3/free-proxy-list/get'
+			f'?request=displayproxies&protocol=http&timeout=10000'
+			f'{country_param}&ssl=all&anonymity=all&simplified=true'
+		)
+		r = _requests.get(url, headers=headers, timeout=20)
+		if r.ok:
+			for line in r.text.strip().splitlines():
+				line = line.strip()
+				if ':' in line:
+					ip, port = line.rsplit(':', 1)
+					if is_valid_proxy(ip, port):
+						collected.add(f'{ip}:{port}')
+		logger.info(f'fetch_free_proxies: proxyscrape added {len(collected) - before_src2}')
+	except Exception as e:
+		logger.warning(f'fetch_free_proxies: proxyscrape failed: {e}')
+
+	before_src3 = len(collected)
+
+	# ── Source 3: free-proxy-list.net HTML table ─────────────────────────────
+	try:
+		r = _requests.get('https://free-proxy-list.net/', headers=headers, timeout=20)
+		if r.ok:
+			soup = BeautifulSoup(r.text, 'lxml')
+			table = soup.find('table')
+			if table:
+				for row in table.find_all('tr')[1:]:
+					cols = row.find_all('td')
+					if len(cols) < 8:
+						continue
+					ip = cols[0].text.strip()
+					port = cols[1].text.strip()
+					country_code = cols[2].text.strip().upper()
+					if country_filter and country_code != country_filter:
+						continue
+					if is_valid_proxy(ip, port):
+						collected.add(f'{ip}:{port}')
+		logger.info(f'fetch_free_proxies: free-proxy-list added {len(collected) - before_src3}')
+	except Exception as e:
+		logger.warning(f'fetch_free_proxies: free-proxy-list.net failed: {e}')
+
+	before_src4 = len(collected)
+
+	# ── Source 4: proxylistfree.com HTML table ───────────────────────────────
+	try:
+		r = _requests.get('https://www.proxylistfree.com/', headers=headers, timeout=20)
+		if r.ok:
+			soup = BeautifulSoup(r.text, 'lxml')
+			table = soup.find('table')
+			if table:
+				for row in table.find_all('tr')[1:]:
+					cols = row.find_all('td')
+					# cols: [protocol, ip, port, country, ...]
+					if len(cols) < 3:
+						continue
+					ip = cols[1].text.strip()
+					port = cols[2].text.strip()
+					# No country code column readily available; skip country filter for this source
+					if is_valid_proxy(ip, port):
+						collected.add(f'{ip}:{port}')
+		logger.info(f'fetch_free_proxies: proxylistfree added {len(collected) - before_src4}')
+	except Exception as e:
+		logger.warning(f'fetch_free_proxies: proxylistfree.com failed: {e}')
+
+	# ── Merge into DB ────────────────────────────────────────────────────────
+	if not collected:
+		logger.warning('fetch_free_proxies: no proxies collected from any source')
+		return {'added': 0, 'total': 0}
+
+	from scanEngine.models import Proxy as ProxyModel
+	proxy_obj, _ = ProxyModel.objects.get_or_create(pk=1)
+	existing_lines = set(
+		line.strip()
+		for line in (proxy_obj.proxies or '').splitlines()
+		if line.strip()
+	)
+	new_proxies = collected - existing_lines
+	all_proxies = existing_lines | collected
+	proxy_obj.proxies = '\n'.join(sorted(all_proxies))
+	proxy_obj.save()
+
+	logger.info(
+		f'fetch_free_proxies: added {len(new_proxies)} new proxies '
+		f'({len(all_proxies)} total in DB)'
+	)
+	return {'added': len(new_proxies), 'total': len(all_proxies)}
+
+
 @app.task(name='send_notif', bind=False, queue='send_notif_queue')
 def send_notif(
 		message,

@@ -3238,3 +3238,22 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					print(e)
 
 		return qs
+
+
+class FetchFreeProxies(APIView):
+	"""Trigger a background Celery task that scrapes free HTTP proxies from
+	multiple public sources (proxifly, proxyscrape, free-proxy-list.net,
+	proxylistfree.com) and merges them into the reNgine Proxy settings.
+
+	Optional query param:
+	  ?country=ID  — filter to a specific 2-letter ISO country code.
+	"""
+
+	def get(self, request):
+		country = request.query_params.get('country', '').upper().strip() or None
+		task = fetch_free_proxies.delay(country_filter=country)
+		return Response({
+			'status': True,
+			'message': 'Proxy fetch started. Proxies will be added to your proxy list once complete.',
+			'task_id': task.id,
+		}, status=HTTP_202_ACCEPTED)
