@@ -413,6 +413,8 @@ def report(ctx=None, description=None):
 	if scan:
 		if not subscan:
 			scan.scan_status = status
+		# Set stop_scan_date BEFORE send_scan_notif so duration calc in
+		# get_scan_fields() doesn't subtract None - datetime
 		scan.stop_scan_date = timezone.now()
 		scan.save()
 

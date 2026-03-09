@@ -885,9 +885,13 @@ def get_scan_fields(engine, scan, subscan=None, status='RUNNING', tasks=[]):
 	# Find scan elapsed time
 	duration = None
 	if scan_obj and status in ['ABORTED', 'FAILED', 'SUCCESS']:
-		td = scan_obj.stop_scan_date - scan_obj.start_scan_date
-		duration = humanize.naturaldelta(td)
-	elif scan_obj:
+		if scan_obj.stop_scan_date and scan_obj.start_scan_date:
+			td = scan_obj.stop_scan_date - scan_obj.start_scan_date
+			duration = humanize.naturaldelta(td)
+		elif scan_obj.start_scan_date:
+			td = timezone.now() - scan_obj.start_scan_date
+			duration = humanize.naturaldelta(td)
+	elif scan_obj and scan_obj.start_scan_date:
 		td = timezone.now() - scan_obj.start_scan_date
 		duration = humanize.naturaldelta(td)
 
