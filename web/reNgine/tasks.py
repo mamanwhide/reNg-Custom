@@ -844,6 +844,23 @@ def dorking(config, host, scan_history_id, results_dir):
 	results = []
 	google_blocked = False  # Track if Google has blocked this IP session
 
+	# Auto-fetch free proxies if no proxy is configured, to reduce Google IP-block risk
+	try:
+		proxy_obj = Proxy.objects.first()
+		if not proxy_obj or not proxy_obj.use_proxy or not proxy_obj.proxies.strip():
+			logger.info('Dorking: no proxy configured — auto-fetching free proxies ...')
+			fetch_result = fetch_free_proxies()
+			if fetch_result.get('total', 0) > 0:
+				proxy_obj = Proxy.objects.first()
+				if proxy_obj and proxy_obj.proxies.strip():
+					proxy_obj.use_proxy = True
+					proxy_obj.save()
+					logger.info(f'Dorking: {fetch_result["total"]} proxy/proxies now active for GooFuzz')
+			else:
+				logger.warning('Dorking: auto-fetch returned no proxies — proceeding without proxy')
+	except Exception as _proxy_e:
+		logger.warning(f'Dorking: proxy auto-fetch failed: {_proxy_e}')
+
 	# custom dorking has higher priority
 	try:
 		for custom_dork in custom_dorks:
@@ -2366,7 +2383,14 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 
 		# Get or create EndPoint object
 		response = line.get('response')
-		httpx_crawl = False if response else enable_http_crawl # avoid yet another httpx crawl
+		# Avoid duplicate httpx crawls: multiple nuclei severity tasks run in parallel
+		# and all find the same URLs. Only crawl if endpoint not already in DB with HTTP status.
+		existing_endpoint = EndPoint.objects.filter(
+			http_url=http_url,
+			scan_history=self.scan,
+			http_status__isnull=False
+		).first()
+		httpx_crawl = False if (response or existing_endpoint) else enable_http_crawl
 		endpoint, _ = save_endpoint(
 			http_url,
 			crawl=httpx_crawl,
@@ -2629,6 +2653,9 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
 	tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
+	run_dast = nuclei_specific_config.get('run_dast', False)
+	exclude_tags = nuclei_specific_config.get(NUCLEI_EXCLUDE_TAGS, [])
+	exclude_templates = nuclei_specific_config.get(NUCLEI_EXCLUDE_TEMPLATES, [])
 	tags = ','.join(tags)
 	nuclei_templates = nuclei_specific_config.get(NUCLEI_TEMPLATE)
 	custom_nuclei_templates = nuclei_specific_config.get(NUCLEI_CUSTOM_TEMPLATE)
@@ -2685,6 +2712,25 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 		custom_nuclei_template_paths = [f'{str(elem)}.yaml' for elem in custom_nuclei_templates]
 		template = templates.extend(custom_nuclei_template_paths)
 
+	# Add DAST templates (AI injection, CVE DAST, vulnerability DAST)
+	if run_dast:
+		dast_base = '/root/nuclei-templates/dast'
+		dast_dirs = [
+			f'{dast_base}/ai',
+			f'{dast_base}/cves/2018',
+			f'{dast_base}/cves/2020',
+			f'{dast_base}/cves/2021',
+			f'{dast_base}/cves/2022',
+			f'{dast_base}/vulnerabilities',
+		]
+		import os as _os
+		for d in dast_dirs:
+			if _os.path.isdir(d):
+				templates.append(d)
+				logger.info(f'nuclei_scan: added DAST templates dir {d}')
+			else:
+				logger.warning(f'nuclei_scan: DAST templates dir not found, skipping: {d}')
+
 	# Build CMD
 	cmd = 'nuclei -j'
 	cmd += ' -config /root/.config/nuclei/config.yaml' if use_nuclei_conf else ''
@@ -2700,6 +2746,11 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	# cmd += f' -severity {severities_str}'
 	cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
 	cmd += f' -tags {tags}' if tags else ''
+	if exclude_tags:
+		cmd += f' -etags {",".join(exclude_tags)}'
+	if exclude_templates:
+		for et in exclude_templates:
+			cmd += f' -et {et}'
 	cmd += f' -silent'
 	for tpl in templates:
 		cmd += f' -t {tpl}'

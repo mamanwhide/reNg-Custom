@@ -31,13 +31,13 @@
       \ 'enable_http_crawl': true,\r\n  'concurrency': 50,\r\n  'intensity': 'normal',\r\n
       \ 'rate_limit': 150,\r\n  'retries': 1,\r\n  'timeout': 5,\r\n  'fetch_gpt_report':
       false,\r\n  'nuclei': {\r\n    'use_nuclei_config': false,\r\n    'severities':
-      ['unknown', 'info', 'low', 'medium', 'high', 'critical']\r\n  }\r\n}\r\nwaf_detection:
+      ['unknown', 'info', 'low', 'medium', 'high', 'critical'],\r\n    'run_dast':
+      true,\r\n    'exclude_tags': ['webauthn', 'passkey']\r\n  }\r\n}\r\nwaf_detection:
       {\r\n\r\n}\r\nscreenshot: {\r\n  'enable_http_crawl': true,\r\n  'intensity':
       'normal',\r\n  'timeout': 10,\r\n  'threads': 40\r\n}\r\n\r\n# custom_headers:
       [\"Cookie: Test\"]"
     default_engine: true
 - model: scanEngine.enginetype
-  pk: 2
   fields:
     engine_name: Subdomain Scan
     yaml_configuration: "subdomain_discovery: {\r\n  'uses_tools': [\r\n    'subfinder',
@@ -74,7 +74,8 @@
       \ 'enable_http_crawl': true,\r\n  'concurrency': 50,\r\n  'intensity': 'normal',\r\n
       \ 'rate_limit': 150,\r\n  'retries': 1,\r\n  'timeout': 5,\r\n  'fetch_gpt_report':
       false,\r\n  'nuclei': {\r\n    'use_nuclei_config': false,\r\n    'severities':
-      ['unknown', 'info', 'low', 'medium', 'high', 'critical']\r\n  }\r\n}"
+      ['unknown', 'info', 'low', 'medium', 'high', 'critical'],\r\n    'run_dast':
+      true,\r\n    'exclude_tags': ['webauthn', 'passkey']\r\n  }\r\n}"
     default_engine: true
 - model: scanEngine.enginetype
   pk: 5
