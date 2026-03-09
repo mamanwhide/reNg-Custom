@@ -3385,12 +3385,17 @@ def vulnerability_scan(self, urls=None, ctx=None, description=None):
 	should_run_dalfox = config.get(RUN_DALFOX, False)
 	should_run_s3scanner = config.get(RUN_S3SCANNER, True)
 
+	# Determine DAST label for timeline display
+	nuclei_specific_config_pre = config.get('nuclei', {})
+	_run_dast = nuclei_specific_config_pre.get('run_dast', False)
+	_nuclei_desc = 'Nuclei Scan + DAST' if _run_dast else 'Nuclei Scan'
+
 	grouped_tasks = []
 	if should_run_nuclei:
 		_task = nuclei_scan.si(
 			urls=urls,
 			ctx=ctx,
-			description=f'Nuclei Scan'
+			description=_nuclei_desc
 		)
 		grouped_tasks.append(_task)
 
@@ -3420,9 +3425,13 @@ def vulnerability_scan(self, urls=None, ctx=None, description=None):
 	celery_group = group(grouped_tasks)
 	job = celery_group.apply_async()
 
-	# MED-06 fix: Use job.get() instead of busy-wait polling
+	# MED-06 fix: Use allow_join_result() to permit job.get() inside a task.
+	# Without this, Celery raises "Never call result.get() within a task!"
+	# which causes vulnerability_scan to return prematurely while subtasks
+	# (nuclei, dalfox, etc.) are still running, marking the scan as complete.
 	try:
-		job.get(timeout=7200, interval=5)
+		with allow_join_result():
+			job.get(timeout=7200, interval=5)
 	except Exception as e:
 		logger.error(f'Vulnerability scan error or timeout: {e}')
 

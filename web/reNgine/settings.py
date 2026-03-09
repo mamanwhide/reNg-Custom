@@ -206,6 +206,14 @@ CELERY_IGNORE_RESULTS = False
 CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
 CELERY_TRACK_STARTED = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Fix: gevent + Redis backend causes BlockingSwitchOutError during AsyncResult
+# garbage collection (__del__ calls unsubscribe which triggers blocking DNS).
+# socket_timeout prevents the connection attempt from hanging inside gevent.
+CELERY_RESULT_BACKEND_TRANSPORT_OPTIONS = {
+    'retry_policy': {'timeout': 5.0},
+    'socket_connect_timeout': 5,
+    'socket_timeout': 5,
+}
 '''
 ROLES and PERMISSIONS
 '''
