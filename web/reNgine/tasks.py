@@ -3886,9 +3886,14 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	celery_group = group(grouped_tasks)
 	job = celery_group.apply_async()
 
-	# MED-06 fix: Use job.get() instead of busy-wait polling
+	# allow_join_result() is required here because nuclei_scan is itself a
+	# Celery task and calling job.get() inside a task raises
+	# "Never call result.get() within a task!" without this context manager.
+	# (The allow_join_result() in vulnerability_scan does NOT propagate into
+	# child tasks — each task that calls .get() must have its own guard.)
 	try:
-		job.get(timeout=7200, interval=5)
+		with allow_join_result():
+			job.get(timeout=7200, interval=5)
 	except Exception as e:
 		logger.error(f'Vulnerability scan with all severities error or timeout: {e}')
 
