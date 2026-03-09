@@ -1749,3 +1749,222 @@ function detect_subdomain_cms(http_url, http_status){
 		cms_detector_api_call(http_url);
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HUMINT functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function get_humint_employees(scan_id) {
+	$.getJSON(`/api/queryHumintEmployees/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['employees'] || [];
+		$('#humint-employees-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
+		$('#humint-employees-tbody').empty();
+		if (rows.length === 0) {
+			$('#humint-employees-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			return;
+		}
+		rows.forEach(function(emp) {
+			var links = '';
+			if (emp.linkedin_url) links += `<a href="${emp.linkedin_url}" target="_blank" class="me-1 badge badge-soft-primary">LinkedIn</a>`;
+			if (emp.github_url)   links += `<a href="${emp.github_url}" target="_blank" class="me-1 badge badge-soft-dark">GitHub</a>`;
+			var email_cell = emp.email ? `<span class="badge badge-soft-info">${emp.email}</span>` : '';
+			var src_badge  = emp.source ? `<span class="badge badge-soft-secondary">${emp.source}</span>` : '';
+			$('#humint-employees-tbody').append(`<tr>
+				<td>${emp.full_name || ''}</td>
+				<td>${emp.designation || ''}</td>
+				<td>${email_cell}</td>
+				<td>${src_badge}</td>
+				<td>${links}</td>
+			</tr>`);
+		});
+		$('#humint-section').show();
+	});
+}
+
+function get_humint_jobs(scan_id) {
+	$.getJSON(`/api/queryHumintJobPostings/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['job_postings'] || [];
+		$('#humint-jobs-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
+		$('#humint-jobs-tbody').empty();
+		if (rows.length === 0) {
+			$('#humint-jobs-tbody').append('<tr><td colspan="4" class="text-muted text-center">Tidak ada data</td></tr>');
+			return;
+		}
+		rows.forEach(function(job) {
+			var tech_badges = '';
+			if (job.technologies && job.technologies.length) {
+				job.technologies.forEach(function(t) {
+					tech_badges += `<span class="badge badge-soft-warning me-1">${t}</span>`;
+				});
+			}
+			var title_cell = job.url
+				? `<a href="${job.url}" target="_blank">${job.title || ''}</a>`
+				: (job.title || '');
+			var src_badge = job.source ? `<span class="badge badge-soft-secondary">${job.source}</span>` : '';
+			$('#humint-jobs-tbody').append(`<tr>
+				<td>${title_cell}</td>
+				<td>${job.company || ''}</td>
+				<td>${tech_badges}</td>
+				<td>${src_badge}</td>
+			</tr>`);
+		});
+		$('#humint-section').show();
+	});
+}
+
+function get_humint_github(scan_id) {
+	$.getJSON(`/api/queryHumintGithub/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['github_recon'] || [];
+		if (rows.length === 0) return;
+		$('#humint-github-card').show();
+		$('#humint-section').show();
+		var html = '';
+		rows.forEach(function(g) {
+			var secrets_badge = g.secrets_found
+				? `<span class="badge badge-soft-danger ms-2">Secrets Terdeteksi</span>` : '';
+			var members = g.members_json ? JSON.parse(g.members_json) : [];
+			var repos   = g.repos_json   ? JSON.parse(g.repos_json)   : [];
+			var emails  = g.emails_found ? JSON.parse(g.emails_found)  : [];
+			html += `<div class="row mb-3">
+				<div class="col-md-4">
+					<strong>${g.org_name || g.org_login || '-'}</strong>${secrets_badge}
+					${g.org_description ? `<p class="text-muted small mt-1">${g.org_description}</p>` : ''}
+					<p class="mb-0 small"><i class="mdi mdi-source-repository me-1"></i>${g.public_repos} repos &nbsp;
+					<i class="mdi mdi-account-group me-1"></i>${g.public_members} members</p>
+					${g.org_location ? `<p class="mb-0 small text-muted">${g.org_location}</p>` : ''}
+				</div>
+				<div class="col-md-4">
+					<p class="small mb-1"><strong>Members (${members.length}):</strong></p>
+					<p class="small text-muted">${members.slice(0,10).join(', ')}${members.length > 10 ? ' ...' : ''}</p>
+					<p class="small mb-1"><strong>Email dari commit (${emails.length}):</strong></p>
+					<p class="small text-muted">${emails.slice(0,5).join(', ')}${emails.length > 5 ? ' ...' : ''}</p>
+				</div>
+				<div class="col-md-4">
+					<p class="small mb-1"><strong>Repos (${repos.length}):</strong></p>
+					<p class="small text-muted">${repos.slice(0,8).join(', ')}${repos.length > 8 ? ' ...' : ''}</p>
+				</div>
+			</div><hr>`;
+		});
+		$('#humint-github-content').html(html);
+	});
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIGINT functions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function get_sigint_asn(scan_id) {
+	$.getJSON(`/api/querySigintAsn/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['asn_records'] || [];
+		$('#sigint-asn-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
+		$('#sigint-asn-tbody').empty();
+		if (rows.length === 0) {
+			$('#sigint-asn-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			return;
+		}
+		rows.forEach(function(r) {
+			var cidrs = (r.cidr_ranges || []).slice(0,3).join(', ');
+			if ((r.cidr_ranges || []).length > 3) cidrs += ' ...';
+			$('#sigint-asn-tbody').append(`<tr>
+				<td><code>${r.asn || ''}</code></td>
+				<td>${r.org_name || ''}</td>
+				<td>${r.country || ''}</td>
+				<td class="small">${cidrs}</td>
+				<td>${r.ip_count || 0}</td>
+			</tr>`);
+		});
+		$('#sigint-section').show();
+	});
+}
+
+function get_sigint_email_security(scan_id) {
+	$.getJSON(`/api/querySigintEmailSecurity/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['email_security'] || [];
+		$('#sigint-email-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
+		$('#sigint-email-tbody').empty();
+		if (rows.length === 0) {
+			$('#sigint-email-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			return;
+		}
+		rows.forEach(function(r) {
+			var risk_class = r.spoofing_risk === 'high' ? 'badge-soft-danger'
+				: r.spoofing_risk === 'medium' ? 'badge-soft-warning' : 'badge-soft-success';
+			var spf_badge = r.spf_policy
+				? `<span class="badge badge-soft-info">${r.spf_policy}</span>` : '<span class="badge badge-soft-secondary">-</span>';
+			var dmarc_badge = r.dmarc_policy
+				? `<span class="badge badge-soft-info">${r.dmarc_policy}</span>` : '<span class="badge badge-soft-secondary">-</span>';
+			$('#sigint-email-tbody').append(`<tr>
+				<td>${r.domain_checked || ''}</td>
+				<td>${spf_badge}</td>
+				<td>${dmarc_badge}</td>
+				<td class="small">${r.mail_provider || ''}</td>
+				<td><span class="badge ${risk_class}">${r.spoofing_risk || '-'}</span></td>
+			</tr>`);
+		});
+		$('#sigint-section').show();
+	});
+}
+
+function get_sigint_intel(scan_id) {
+	$.getJSON(`/api/querySigintIntelligence/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['intel_records'] || [];
+		$('#sigint-intel-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
+		$('#sigint-intel-tbody').empty();
+		if (rows.length === 0) {
+			$('#sigint-intel-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			return;
+		}
+		rows.forEach(function(r) {
+			var ports = (r.open_ports || []).slice(0,8).join(', ');
+			if ((r.open_ports || []).length > 8) ports += ' ...';
+			var vulns = [];
+			try { vulns = Object.keys(JSON.parse(r.vulns_json || '{}')); } catch(e) {}
+			var vuln_cell = vulns.length ? `<span class="badge badge-soft-danger">${vulns.length} CVE</span>` : '';
+			var tags_cell = (r.tags || []).map(t => `<span class="badge badge-soft-secondary me-1">${t}</span>`).join('');
+			var src_icon  = r.source === 'shodan' ? 'text-danger' : 'text-info';
+			$('#sigint-intel-tbody').append(`<tr>
+				<td><code>${r.ip_address || ''}</code> <span class="badge badge-soft-secondary ${src_icon}">${r.source || ''}</span></td>
+				<td class="small">${r.org || r.isp || ''}</td>
+				<td class="small">${ports}</td>
+				<td>${vuln_cell}</td>
+				<td>${tags_cell}</td>
+			</tr>`);
+		});
+		$('#sigint-section').show();
+	});
+}
+
+function get_sigint_certs(scan_id) {
+	$.getJSON(`/api/querySigintCertificates/?scan_id=${scan_id}&format=json`, function(data) {
+		var rows = data['cert_records'] || [];
+		$('#sigint-cert-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
+		$('#sigint-cert-tbody').empty();
+		if (rows.length === 0) {
+			$('#sigint-cert-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			return;
+		}
+		rows.forEach(function(r) {
+			var expiry_cell = '';
+			if (r.is_expired) {
+				expiry_cell = '<span class="badge badge-soft-danger">Kedaluwarsa</span>';
+			} else if (r.days_to_expiry !== null && r.days_to_expiry < 30) {
+				expiry_cell = `<span class="badge badge-soft-warning">${r.days_to_expiry}h lagi</span>`;
+			} else if (r.not_after) {
+				expiry_cell = `<span class="small text-muted">${r.not_after.substring(0,10)}</span>`;
+			}
+			var algo_cell = `${r.key_algorithm || ''} ${r.key_bits ? r.key_bits+'bit' : ''}`;
+			var issues = [];
+			if (r.is_self_signed)      issues.push('<span class="badge badge-soft-warning">Self-signed</span>');
+			if (r.uses_deprecated_algo) issues.push('<span class="badge badge-soft-danger">Weak algo</span>');
+			if (r.is_wildcard)          issues.push('<span class="badge badge-soft-info">Wildcard</span>');
+			$('#sigint-cert-tbody').append(`<tr>
+				<td class="small"><code>${r.common_name || ''}</code></td>
+				<td class="small">${r.issuer_org || r.issuer || ''}</td>
+				<td>${expiry_cell}</td>
+				<td class="small">${algo_cell}</td>
+				<td>${issues.join(' ')}</td>
+			</tr>`);
+		});
+		$('#sigint-section').show();
+	});
+}

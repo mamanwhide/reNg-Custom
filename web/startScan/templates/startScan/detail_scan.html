@@ -1214,6 +1214,167 @@ Scan Findings
 				</div>
 			</div>
 		</div>
+
+		{# ── HUMINT Section ──────────────────────────────────────────── #}
+		<div class="row mt-3" id="humint-section" style="display:none">
+			<div class="col-12">
+				<h5 class="text-muted mb-2">HUMINT — Human Intelligence</h5>
+			</div>
+			{# Employee Profiles (GitHub + LinkedIn) #}
+			<div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-0">
+							<span id="humint-employees-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
+							Profil Karyawan (HUMINT)
+						</h4>
+						<table class="table mt-3 table-sm">
+							<thead class="table-light">
+								<tr>
+									<th>Nama</th>
+									<th>Jabatan</th>
+									<th>Email</th>
+									<th>Sumber</th>
+									<th>Tautan</th>
+								</tr>
+							</thead>
+							<tbody id="humint-employees-tbody"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			{# Job Postings / Tech Stack #}
+			<div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-0">
+							<span id="humint-jobs-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
+							Lowongan Kerja &amp; Tech Stack
+						</h4>
+						<table class="table mt-3 table-sm">
+							<thead class="table-light">
+								<tr>
+									<th>Posisi</th>
+									<th>Perusahaan</th>
+									<th>Teknologi Terdeteksi</th>
+									<th>Sumber</th>
+								</tr>
+							</thead>
+							<tbody id="humint-jobs-tbody"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			{# GitHub Org Recon #}
+			<div class="col-12" id="humint-github-card" style="display:none">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-2">GitHub Org Recon</h4>
+						<div id="humint-github-content"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		{# ── SIGINT Section ──────────────────────────────────────────── #}
+		<div class="row mt-3" id="sigint-section" style="display:none">
+			<div class="col-12">
+				<h5 class="text-muted mb-2">SIGINT — Signals Intelligence</h5>
+			</div>
+			{# Email Security SPF/DKIM/DMARC #}
+			<div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-0">
+							<span id="sigint-email-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
+							Keamanan Email (SPF / DKIM / DMARC)
+						</h4>
+						<table class="table mt-3 table-sm">
+							<thead class="table-light">
+								<tr>
+									<th>Domain</th>
+									<th>SPF</th>
+									<th>DMARC</th>
+									<th>Penyedia Mail</th>
+									<th>Risiko Spoofing</th>
+								</tr>
+							</thead>
+							<tbody id="sigint-email-tbody"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			{# ASN / BGP #}
+			<div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-0">
+							<span id="sigint-asn-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
+							ASN / BGP Records
+						</h4>
+						<table class="table mt-3 table-sm">
+							<thead class="table-light">
+								<tr>
+									<th>ASN</th>
+									<th>Organisasi</th>
+									<th>Negara</th>
+									<th>CIDR Ranges</th>
+									<th>Jml IP</th>
+								</tr>
+							</thead>
+							<tbody id="sigint-asn-tbody"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			{# Passive Intelligence (Shodan/Censys) #}
+			<div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-0">
+							<span id="sigint-intel-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
+							Passive Intel (Shodan / Censys)
+						</h4>
+						<table class="table mt-3 table-sm">
+							<thead class="table-light">
+								<tr>
+									<th>IP</th>
+									<th>Org / ISP</th>
+									<th>Port Terbuka</th>
+									<th>CVE</th>
+									<th>Tag</th>
+								</tr>
+							</thead>
+							<tbody id="sigint-intel-tbody"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			{# TLS Certificates #}
+			<div class="col-xl-6 col-lg-6 col-md-12 col-sm-12 col-12">
+				<div class="card">
+					<div class="card-body">
+						<h4 class="header-title mb-0">
+							<span id="sigint-cert-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
+							Analisis Sertifikat TLS
+						</h4>
+						<table class="table mt-3 table-sm">
+							<thead class="table-light">
+								<tr>
+									<th>Common Name</th>
+									<th>Issuer</th>
+									<th>Kedaluwarsa</th>
+									<th>Algoritma</th>
+									<th>Status</th>
+								</tr>
+							</thead>
+							<tbody id="sigint-cert-tbody"></tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+		</div>
+
 	</div>
 	{% endif %}
 
@@ -2166,6 +2327,13 @@ $(document).ready(function() {
 		get_emails({{scan_history_id}});
 		get_employees({{scan_history_id}});
 		get_dorks({{scan_history_id}});
+		get_humint_employees({{scan_history_id}});
+		get_humint_jobs({{scan_history_id}});
+		get_humint_github({{scan_history_id}});
+		get_sigint_asn({{scan_history_id}});
+		get_sigint_email_security({{scan_history_id}});
+		get_sigint_intel({{scan_history_id}});
+		get_sigint_certs({{scan_history_id}});
 	});
 
 	$("#pills-visualisation-tab").click(function() {
