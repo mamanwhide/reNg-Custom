@@ -43,10 +43,27 @@ echo "Migrations are ready!"
 
 python3 manage.py collectstatic --no-input
 
-# Load default engines, keywords, and external tools
-python3 manage.py loaddata fixtures/default_scan_engines.yaml --app scanEngine.EngineType
-python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
-python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
+# Load default engines, keywords, and external tools (hanya jika belum ada data)
+ENGINE_COUNT=$(python3 manage.py shell -c "from scanEngine.models import EngineType; print(EngineType.objects.count())" 2>/dev/null | tail -1)
+if [ "$ENGINE_COUNT" = "0" ]; then
+  python3 manage.py loaddata fixtures/default_scan_engines.yaml --app scanEngine.EngineType
+else
+  echo "Scan engines already loaded ($ENGINE_COUNT engines), skipping."
+fi
+
+KEYWORD_COUNT=$(python3 manage.py shell -c "from scanEngine.models import InterestingLookupModel; print(InterestingLookupModel.objects.count())" 2>/dev/null | tail -1)
+if [ "$KEYWORD_COUNT" = "0" ]; then
+  python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
+else
+  echo "Keywords already loaded ($KEYWORD_COUNT keywords), skipping."
+fi
+
+TOOL_COUNT=$(python3 manage.py shell -c "from scanEngine.models import InstalledExternalTool; print(InstalledExternalTool.objects.count())" 2>/dev/null | tail -1)
+if [ "$TOOL_COUNT" = "0" ]; then
+  python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
+else
+  echo "External tools already loaded ($TOOL_COUNT tools), skipping."
+fi
 
 # install firefox https://askubuntu.com/a/1404401
 if [ "$NETWORK_AVAILABLE" = true ]; then
