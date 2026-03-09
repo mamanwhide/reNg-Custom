@@ -1,623 +1,263 @@
-<p align="center">
-<a href="https://rengine.wiki"><img src=".github/screenshots/banner.gif" alt=""/></a>
-</p>
+# reNgine-Custom
+
+Fork privat dari [reNgine v2.2.0](https://github.com/yogeshojha/rengine) dengan perbaikan keamanan, penyempurnaan fungsional, dan tambahan kemampuan OSINT tingkat lanjut (HUMINT dan SIGINT).
+
+---
+
+## Daftar Isi
+
+- [TL;DR](#tldr)
+- [Arsitektur dan Cara Kerja](#arsitektur-dan-cara-kerja)
+- [Daftar Tools](#daftar-tools)
+- [Cara Menggunakan](#cara-menggunakan)
+- [Instalasi](#instalasi)
+- [Riwayat Pembaruan](#riwayat-pembaruan)
+
+---
+
+## TL;DR
+
+reNgine-Custom adalah platform otomasi reconnaissance web aplikasi berbasis Docker. Pengguna mendefinisikan target domain, memilih scan engine (sekumpulan konfigurasi YAML), lalu sistem menjalankan seluruh tahapan recon secara otomatis mulai dari enumerasi subdomain hingga pemindaian kerentanan, OSINT, dan analisis sertifikat TLS, semuanya disimpan ke database PostgreSQL dan dapat difilter via antarmuka web.
+
+Fork ini menambahkan:
+- 27 perbaikan keamanan (dari audit mendalam terhadap 20 file sumber)
+- Perbaikan integrasi Ollama LLM untuk laporan kerentanan
+- OSINT mendalam: HUMINT (GitHub org recon, LinkedIn dork, job posting intel) dan SIGINT (ASN/BGP, SPF/DKIM/DMARC, passive intel via Shodan, analisis sertifikat TLS)
+- Perbaikan dorking (deteksi blokir GooFuzz, fallback Bing, proxy otomatis)
+- Template DAST nuclei (249 template: AI, CVE, vulnerabilities) dengan eksklusi false-positive
+
+---
+
+## Arsitektur dan Cara Kerja
+
+```
+Browser (HTTPS)
+    |
+    v
+Nginx (reverse proxy, TLS termination)
+    |
+    v
+Gunicorn / Django (web + REST API)
+    |
+    +---> PostgreSQL  (semua data recon disimpan di sini)
+    |
+    v
+Celery Workers  <---  Redis (message broker + result backend)
+    |
+    +--- main_scan_queue        : orkestrasi scan utama
+    +--- subscan_queue          : subscan per subdomain
+    +--- osint_discovery_queue  : OSINT, HUMINT, SIGINT, theHarvester
+    +--- dorking_queue          : Google/Bing dork via GooFuzz
+    +--- theHarvester_queue     : email, subdomain, employee harvest
+    +--- h8mail_queue           : credential breach check
+    +--- vulnerability_scan_queue : nuclei, dalfox, crlfuzz
+    +--- (dan antrean lainnya)
+    |
+    v
+Scan Result Files
+    /usr/src/app/scan_results/{domain}/{scan_id}/
+```
+
+Alur kerja scan:
+
+1. Pengguna membuat target, memilih engine, klik "Initiate Scan"
+2. `initiate_scan` (Celery task) membuat `ScanHistory`, lalu membangun Celery chord:
+   - Grup paralel: subdomain discovery, OSINT, port scan
+   - Setelah grup selesai: HTTP crawl, dir/file fuzz, fetch URL
+   - Paralel lagi: vulnerability scan, screenshot, WAF detection
+3. Setiap task menyimpan hasilnya langsung ke PostgreSQL
+4. Antarmuka web mem-poll via REST API untuk memperbarui UI secara live
+
+---
+
+## Daftar Tools
+
+| Kategori | Tool | Keterangan |
+|----------|------|-----------|
+| Subdomain Discovery | subfinder, ctfr, sublist3r, tlsx, oneforall, netlas, chaos | Enumerasi subdomain dari berbagai sumber |
+| HTTP Crawl | httpx | Probing HTTP/HTTPS ke semua subdomain, ambil status, header, title |
+| Port Scan | naabu | Fast port scanner; opsional dilanjutkan nmap |
+| Directory Fuzz | ffuf | Directory dan file fuzzing |
+| Endpoint Discovery | gospider, hakrawler, waybackurls, katana, gau | Crawl dan arsip URL |
+| Screenshot | gowitness | Screenshot setiap subdomain yang hidup |
+| Vulnerability Scan | nuclei | Template CVE, DAST AI, DAST vulnerabilities (249 template custom) |
+| XSS | dalfox | Reflected dan DOM XSS |
+| CRLF | crlfuzz | CRLF injection |
+| S3 Bucket | s3scanner | Misconfigured S3 detection |
+| OSINT | theHarvester | Email, subdomain, employee dari Bing, CertSpotter, HunterIO, dll |
+| OSINT | h8mail | Credential breach check |
+| OSINT Dork | GooFuzz | Google/Bing dork (login pages, admin panels, config files, dll) |
+| HUMINT | humint_github_recon | GitHub org recon: members, repos, email dari commit, deteksi secrets |
+| HUMINT | humint_linkedin_recon | Bing dork site:linkedin.com/in/ untuk enumerasi karyawan |
+| HUMINT | humint_job_postings | Job posting dork: ekstraksi tech stack (AWS, K8s, LDAP, dll) |
+| SIGINT | sigint_asn_recon | ASN/BGP enumeration via BGPView.io + amass intel |
+| SIGINT | sigint_email_security | Audit SPF, DKIM (20 selector), DMARC + penilaian risiko spoofing |
+| SIGINT | sigint_passive_intel | Shodan/Censys/InternetDB: open ports, CVEs, services per IP |
+| SIGINT | sigint_cert_analysis | TLS handshake langsung + CT log (crt.sh), deteksi cert expired/self-signed/SHA1 |
+| LLM | Ollama / OpenAI GPT | Deskripsi kerentanan, impact, remediation, attack surface suggestion |
+| WAF | wafw00f | Web Application Firewall detection |
+| WHOIS | built-in | Domain registration info |
+
+---
+
+## Cara Menggunakan
 
-<p align="center">
-  <h3>reNgine: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
-</p>
+### Menjalankan Scan
 
-<p align="center"><a href="https://github.com/yogeshojha/rengine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v2.2.0-informational?&logo=none" alt="reNgine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+1. Buka antarmuka web di `https://localhost` (atau IP server)
+2. Buat project baru (menu Projects)
+3. Tambahkan target domain (menu Targets)
+4. Pilih scan engine dari daftar yang tersedia:
+   - **Full Scan**: semua modul aktif termasuk HUMINT, SIGINT, DAST
+   - **OSINT**: hanya OSINT, HUMINT, SIGINT, dorking
+   - **Subdomain Scan**: hanya enumerasi subdomain
+   - **Vulnerability Scan**: subdomain + port scan + nuclei
+   - **Port Scan**: hanya port scan
+   - **reNgine Recommended**: set default yang seimbang
+5. Klik "Initiate Scan"
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
-  <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--USA-2022-blue.svg?logo=none" alt="" /></a>&nbsp;
-  <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/Open--Source--Summit-2022-blue.svg?logo=none" alt="" /></a>&nbsp;
-  <a href="https://cyberweek.ae/2021/hitb-armory/" target="_blank"><img src="https://img.shields.io/badge/HITB--Armory-2021-blue.svg?logo=none" alt="" /></a>&nbsp;
-  <a href="https://www.youtube.com/watch?v=7uvP6MaQOX0" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--USA-2021-blue.svg?logo=none" alt="" /></a>&nbsp;
-  <a href="https://drive.google.com/file/d/1Bh8lbf-Dztt5ViHJVACyrXMiglyICPQ2/view?usp=sharing" target="_blank"><img src="https://img.shields.io/badge/Defcon--Demolabs--29-2021-blue.svg?logo=none" alt="" /></a>&nbsp;
-  <a href="https://www.youtube.com/watch?v=A1oNOIc0h5A" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Europe-2020-blue.svg?&logo=none" alt="" /></a>&nbsp;
-</p>
+### Konfigurasi Scan Engine (YAML)
 
-<p align="center">
-<a href="https://github.com/yogeshojha/rengine/actions/workflows/codeql-analysis.yml" target="_blank"><img src="https://github.com/yogeshojha/rengine/actions/workflows/codeql-analysis.yml/badge.svg" alt="" /></a>&nbsp;<a href="https://github.com/yogeshojha/rengine/actions/workflows/build.yml" target="_blank"><img src="https://github.com/yogeshojha/rengine/actions/workflows/build.yml/badge.svg" alt="" /></a>&nbsp;
-</p>
+Setiap engine dikonfigurasi via YAML. Contoh untuk mengaktifkan HUMINT dan SIGINT pada OSINT engine:
 
-<p align="center">
-<a href="https://discord.gg/H6WzebwX3H" target="_blank"><img src="https://img.shields.io/discord/880363103689277461" alt="" /></a>&nbsp;
-</p>
+```yaml
+osint:
+  discover: [emails, metainfo, employees]
+  dorks: [login_pages, admin_panels, config_files, git_exposed]
+  humint:
+    github_org: true
+    linkedin: true
+    job_postings: true
+  sigint:
+    asn_recon: true
+    email_security: true
+    passive_intel: false   # perlu SHODAN_API_KEY di settings
+    cert_analysis: true
+  documents_limit: 50
+```
 
-<p align="center">
-<a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
-<img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
-</p>
-<h4>reNgine 2.2.0 is released!</h4>
-<p>
-  reNgine 2.2.0 comes with bounty hub where you can sync and import your hackerone programs, in app notifications, chaos as subdomain enumeration tool, ability to upload multiple nuclei and gf patterns, support for regex in out of scope subdomain config, additional pdf report template and many more. 
-  <b>Check out <a href="https://rengine.wiki/whats-new/2_2_0/">What's new in reNgine 2.2.0!</a></b>
-</p>
+### Subscan
 
-
-<h4>What is reNgine?</h4>
-reNgine is your ultimate web application reconnaissance suite, designed to supercharge the recon process for security pros, pentesters, and bug bounty hunters. It is go-to web application reconnaissance suite that's designed to simplify and streamline the reconnaissance process for all the needs of security professionals, penetration testers, and bug bounty hunters. With its highly configurable engines, data correlation capabilities, continuous monitoring, database-backed reconnaissance data, and an intuitive user interface, reNgine redefines how you gather critical information about your target web applications.
-
-Traditional reconnaissance tools often fall short in terms of configurability and efficiency. reNgine addresses these shortcomings and emerges as an excellent alternative to existing commercial tools.
-
-reNgine was created to address the limitations of traditional reconnaissance tools and provide a better alternative, even surpassing some commercial offerings. Whether you're a bug bounty hunter, a penetration tester, or a corporate security team, reNgine is your go-to solution for automating and enhancing your information-gathering efforts.
-</p>
-
-[Watch reNgine 2.0-jasper release trailer here!](https://youtu.be/VwkOWqiWW5g)
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Documentation
-
-Detailed documentation available at [https://rengine.wiki](https://rengine.wiki) 
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-
-## Table of Contents
-
-* [About reNgine](#about-rengine)
-* [Workflow](#workflow)
-* [Features](#features)
-* [Security Hardening, Bug Fixes & Functional Improvements](#security-hardening-bug-fixes--functional-improvements)
-* [Enterprise Support](#enterprise-support)
-* [Quick Installation](#quick-installation)
-* [Installation Video](#installation-video-tutorial)
-* [Community-Curated Videos](#community-curated-videos)
-* [Screenshots](#screenshots)
-* [What's new in reNgine](https://github.com/yogeshojha/rengine/releases)
-* [Contributing](#contributing)
-* [reNgine Support](#rengine-support)
-* [Support and Sponsoring](#support-and-sponsoring)
-* [Reporting Security Vulnerabilities](#reporting-security-vulnerabilities)
-* [License](#license)
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## About reNgine
-
-reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turbocharged the traditional workflow with groundbreaking features that is sure to ease your reconnaissance game. reNgine redefines the art of reconnaissance with highly configurable scan engines, recon data correlation, continuous monitoring, GPT powered Vulnerability Report, Project Management and role based access control etc.
-
-
-🦾&nbsp;&nbsp; reNgine has advanced reconnaissance capabilities, harnessing a range of open-source tools to deliver a comprehensive web application reconnaissance experience. With its intuitive User Interface, it excels in subdomain discovery, pinpointing IP addresses and open ports, collecting endpoints, conducting directory and file fuzzing, capturing screenshots, and performing vulnerability scans. To summarize, it does end-to-end reconnaissance. With WHOIS identification and WAF detection, it offers deep insights into target domains. Additionally, reNgine also identifies misconfigured S3 buckets and find interesting subdomains and URLS, based on specific keywords to helps you identify your next target, making it a go-to tool for efficient reconnaissance.
-
-🗃️&nbsp; &nbsp; Say goodbye to recon data chaos! reNgine seamlessly integrates with a database, providing you with unmatched data correlation and organization. Forgot the hassle of grepping through json, txt or csv files. Plus, our custom query language lets you filter reconnaissance data effortlessly using natural language like operators such as filtering all alive subdomains with `http_status=200` and also filter all subdomains that are alive and has admin in name `http_status=200&name=admin`
-
-🔧&nbsp;&nbsp; reNgine offers unparalleled flexibility through its highly configurable scan engines, based on a YAML-based configuration. It offers the freedom to create and customize recon scan engines based on any kind of requirement, users can tailor them to their specific objectives and preferences, from thread management to timeout settings and rate-limit configurations, everything is customizable. Additionally, reNgine offers a range of pre-configured scan engines right out of the box, including Full Scan, Passive Scan, Screenshot Gathering, and the OSINT Scan Engine. These ready-to-use engines eliminate the need for extensive manual setup, aligning perfectly with reNgine's core mission of simplifying the reconnaissance process and enabling users to effortlessly access the right reconnaissance data with minimal effort.
-
-💎&nbsp;&nbsp;Subscans: Subscan is a game-changing feature in reNgine, setting it apart as the only open-source tool of its kind to offer this capability. With Subscan, waiting for the entire pipeline to complete is a thing of the past. Now, users can swiftly respond to newfound discoveries during reconnaissance. Whether you've stumbled upon an intriguing subdomain and wish to conduct a focused port scan or want to delve deeper with a vulnerability assessment, reNgine has you covered.
-
-📃&nbsp;&nbsp; PDF Reports: In addition to its robust reconnaissance capabilities, reNgine goes the extra mile by simplifying the report generation process, recognizing the crucial role that PDF reports play in the realm of end-to-end reconnaissance. Users can effortlessly generate and customize PDF reports to suit their exact needs. Whether it's a Full Scan Report, Vulnerability Report, or a concise reconnaissance report, reNgine provides the flexibility to choose the report type that best communicates your findings. Moreover, the level of customization is unparalleled, allowing users to select report colors, fine-tune executive summaries, and even add personalized touches like company names and footers. With GPT integration, your reports aren't just a report, with remediation steps, and impacts, you get 360-degree view of the vulnerabilities you've uncovered.
-
-🔖&nbsp; &nbsp; Say Hello to Projects! reNgine 2.0 introduces a powerful addition that enables you to efficiently organize your web application reconnaissance efforts. With this feature, you can create distinct project spaces, each tailored to a specific purpose, such as personal bug bounty hunting, client engagements, or any other specialized recon task. Each projects will have separate dashboard and all the scan results will be separated from each project, while scan engines and configuration will be shared across all the projects.
-
-⚙️&nbsp; &nbsp; Roles and Permissions! In reNgine 2.0, we've taken your web application reconnaissance to a whole new level of control and security. Now, you can assign distinct roles to your team members—Sys Admin, Penetration Tester, and Auditor—each with precisely defined permissions to tailor their access and actions within the reNgine ecosystem.
-
-  - 🔐 Sys Admin: Sys Admin is a superuser that has permission to modify system and scan related configurations, scan engines, create new users, add new tools etc. Superuser can initiate scans and subscans effortlessly.
-  - 🔍 Penetration Tester: Penetration Tester will be allowed to modify and initiate scans and subscans, add or update targets, etc. A penetration tester will not be allowed to modify system configurations.
-  - 📊 Auditor: Auditor can only view and download the report. An auditor can not change any system or scan related configurations nor can initiate any scans or subscans.
-
-🚀&nbsp;&nbsp; GPT Vulnerability Report Generation: Get ready for the future of penetration testing reports with reNgine's groundbreaking feature: "GPT-Powered Report Generation"! With the power of OpenAI's GPT, reNgine now provides you with detailed vulnerability descriptions, remediation strategies, and impact assessments that read like they were written by a human security expert! **But that's not all!** Our GPT-driven reports go the extra mile by scouring the web for related news articles, blogs, and references, so you have a 360-degree view of the vulnerabilities you've uncovered. With reNgine 2.0 revolutionize your penetration testing game and impress your clients with reports that are not just informative but engaging and comprehensive with detailed analysis on impact assessment and remediation strategies.
-
-🥷&nbsp;&nbsp; GPT-Powered Attack Surface Generation: With reNgine 2.0, reNgine seamlessly integrates with GPT to identify the attacks that you can likely perform on a subdomain. By making use of reconnaissance data such as page title, open ports, subdomain name etc. reNgine can advise you the attacks you could perform on a target. reNgine will also provide you the rationale on why the specific attack is likely to be successful.
-
-🧭&nbsp;&nbsp;Continuous monitoring: Continuous monitoring is at the core of reNgine's mission, and it's robust continuous monitoring feature ensures that their targets are under constant scrutiny. With the flexibility to schedule scans at regular intervals, penetration testers can effortlessly stay informed about their targets. What sets reNgine apart is its seamless integration with popular notification channels such as Discord, Slack, and Telegram, delivering real-time alerts for newly discovered subdomains, vulnerabilities, or any changes in reconnaissance data.
-
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Workflow
-
-<img src="https://github.com/yogeshojha/rengine/assets/17223002/10c475b8-b4a8-440d-9126-77fe2038a386">
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Features
-
-* Reconnaissance:
-  * Subdomain Discovery
-  * IP and Open Ports Identification
-  * Endpoints Discovery
-  * Directory/Files fuzzing
-  * Screenshot Gathering
-  * Vulnerability Scan
-    * Nuclei
-    * Dalfox XSS Scanner
-    * CRLFuzzer
-    * Misconfigured S3 Scanner
-  * WHOIS Identification
-  * WAF Detection
-* OSINT Capabilities
-  * Meta info Gathering
-  * Employees Gathering
-  * Email Address gathering
-  * Google Dorking for sensitive info and urls
-* Projects, create distinct project spaces, each tailored to a specific purpose, such as personal bug bounty hunting, client engagements, or any other specialized recon task.
-* Perform Advanced Query lookup using natural language alike and, or, not operations
-* Highly configurable YAML-based Scan Engines
-* Support for Parallel Scans
-* Support for Subscans
-* Recon Data visualization
-* GPT Vulnerability Description, Impact and Remediation generation
-* GPT Attack Surface Generator
-* Multiple Roles and Permissions to cater a team's need
-* Customizable Alerts/Notifications on Slack, Discord, and Telegram
-* Automatically report Vulnerabilities to HackerOne
-* Recon Notes and Todos
-* Clocked Scans (Run reconnaissance exactly at X Hours and Y minutes) and Periodic Scans (Runs reconnaissance every X minutes/- hours/days/week)
-* Proxy Support
-* Screenshot Gallery with Filters
-* Powerful recon data filtering with autosuggestions
-* Recon Data changes, find new/removed subdomains/endpoints
-* Tag targets into the Organization
-* Smart Duplicate endpoint removal based on page title and content length to cleanup the reconnaissance data
-* Identify Interesting Subdomains
-* Custom GF patterns and custom Nuclei Templates
-* Edit tool-related configuration files (Nuclei, Subfinder, Naabu, amass)
-* Add external tools from GitHub/Go
-* Interoperable with other tools, Import/Export Subdomains/Endpoints
-* Import Targets via IP and/or CIDRs
-* Report Generation
-* Toolbox: Comes bundled with most commonly used tools during penetration testing such as whois lookup, CMS detector, CVE lookup, etc.
-* Identification of related domains and related TLDs for targets
-* Find actionable insights such as Most Common Vulnerability, Most Common CVE ID, Most Vulnerable Target/Subdomain, etc.
-* You can now use local LLMs for Attack surface identification and vulnerability description (NEW: reNgine 2.1.0)
-* BountyHub, a central hub to manage your hackerone targets
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Security Hardening, Bug Fixes & Functional Improvements
-
-A comprehensive security audit was conducted across 20 core source files covering the orchestration flow, external tool integrations, dashboard data layer, and REST API. In addition to security hardening, numerous functional bug fixes, infrastructure improvements, and deployment optimizations have been applied. Full security audit details are available in `RENGINE_DEEP_AUDIT_V2.md`.
-
-### Security Audit Summary
-
-| Severity | Findings | Status |
-|----------|----------|--------|
-| CRITICAL | 2 | All Fixed |
-| HIGH | 7 | All Fixed |
-| MEDIUM | 10 | All Fixed |
-| LOW | 8 | All Fixed |
-| **Total** | **27** | **All Fixed** |
-
-### CRITICAL Fixes
-
-| ID | Description | File |
-|----|-------------|------|
-| CRT-01 | Fixed `NoneType` crash in `initiate_scan` when `engine_id` is None. Moved `ScanHistory` query before engine ID resolution. | `tasks.py` |
-| CRT-02 | Eliminated command injection via `run_command('rm -rf ' + dir)` in scan deletion. Replaced with `safe_delete_scan_results()` using `shutil.rmtree()` and path validation. | `startScan/views.py` |
-
-### HIGH Fixes
-
-| ID | Description | File |
-|----|-------------|------|
-| HIGH-01 | Fixed undefined variable `response` in `get_cms_details()` early validation path causing `NameError` crash. | `common_func.py` |
-| HIGH-02 | Corrected wrong attribute name `subscan.scan_status` to `subscan.status` in SubScan abort skip-check. | `api/views.py` |
-| HIGH-03 | Fixed git clone command being overwritten by pip install in `add_tool`. Commands now chained properly. | `scanEngine/views.py` |
-| HIGH-04 | Added `sanitize_shell_arg()` to unsanitized `host` parameter in `geo_localize` shell command. | `tasks.py` |
-| HIGH-05 | Added `validate_domain()` and `sanitize_shell_arg()` to `fetch_related_tlds_and_domains`. Removed `shell=True`. | `tasks.py` |
-| HIGH-06 | Removed duplicate command execution (sync + async) in `UninstallTool`. Replaced shell `rm -rf` with `shutil.rmtree()` and `is_safe_path()`. | `api/views.py` |
-| HIGH-07 | Removed duplicate execution and `shell=True` in `UpdateTool`. Added `validate_install_command()` for update commands. Git pull now uses `cwd=` parameter. | `api/views.py` |
-
-### MEDIUM Fixes
-
-| ID | Description | File |
-|----|-------------|------|
-| MED-01 | Fixed cache-set referencing wrong variable `result` instead of `self.result`, preventing task results from being cached on first execution. | `celery_custom_task.py` |
-| MED-02 | Resolved class name collision `LLMVulnerabilityReportGenerator` between `api/views.py` and `llm.py`. Renamed API view to `LLMVulnerabilityReportView`. | `api/views.py`, `api/urls.py` |
-| MED-03 | Mitigated N+1 query pattern in `SubdomainSerializer` (2500+ queries per page) using `getattr()` fallback for annotated counts. | `api/serializers.py` |
-| MED-04 | Removed Netlas API key exposure in shell command logs. Key now passed via environment variable to `run_command()`. | `tasks.py` |
-| MED-05 | Added `validate_ini_config()` for Amass INI config validation (was the only tool config without validation). | `scanEngine/views.py`, `security.py` |
-| MED-06 | Added `MAX_OUTPUT_SIZE` (1 MB) truncation to `run_command()` to prevent unbounded output storage in database. | `tasks.py` |
-| MED-07 | Added `safe_delete_scan_results()` to bulk `delete_targets` to clean up orphaned scan result directories. | `targetApp/views.py` |
-| MED-08 | Changed Swagger API docs from `AllowAny` to `IsAuthenticated` to prevent unauthenticated access to API documentation. | `urls.py` |
-| MED-09 | Added `sanitize_shell_arg()` to URL parameter in `CMSDetector` API shell command. | `api/views.py` |
-| MED-10 | Added `HttpResponseRedirect` after POST in onboarding view to prevent API key leakage and double-POST on refresh. Cached duplicate `HackerOneAPIKey` queries. | `dashboard/views.py` |
-
-### LOW Fixes
-
-| ID | Description | File |
-|----|-------------|------|
-| LOW-01 | Fixed typo `MEDIM` to `MEDIUM` in screenshot dimension constant. | `definitions.py` |
-| LOW-02 | Replaced mutable default arguments (`=[]`, `={}`) with `=None` and runtime initialization in `initiate_scan`, `crlfuzz_scan`, and `http_crawl`. | `tasks.py` |
-| LOW-03 | Added Django cache with 60-second TTL for 15 dashboard count queries to reduce database load. | `dashboard/views.py` |
-| LOW-04 | Merged into MED-10 (redirect after POST in onboarding). | `dashboard/views.py` |
-| LOW-05 | Replaced `mark_safe(domain_list)` with `json.dumps(domain_list)` to eliminate XSS risk. Updated template to use `|safe` filter. | `targetApp/views.py` |
-| LOW-06 | Removed useless truthiness checks on method references in `ScanHistorySerializer` (bound methods are always truthy). | `api/serializers.py` |
-| LOW-07 | Replaced `run_command('rm -rf ...')` in `delete_all_screenshots` with `os.listdir()` + `is_safe_path()` + `shutil.rmtree()`. Added POST-only method check. | `startScan/views.py` |
-| LOW-08 | Replaced `len(queryset)` with `.count()` in `SubdomainSerializer.get_todos_count` for efficient SQL COUNT. | `api/serializers.py` |
-
-### Security Infrastructure Added
-
-The following utility functions were added or enhanced in `reNgine/security.py`:
-
-| Function | Purpose |
-|----------|--------|
-| `sanitize_shell_arg(arg)` | Shell argument sanitization via `shlex.quote()` |
-| `is_safe_path(base, path)` | Path traversal prevention |
-| `safe_delete_scan_results(domain)` | Safe recursive directory deletion with path validation |
-| `validate_install_command(cmd)` | Whitelist-based command validation |
-| `validate_ini_config(content)` | INI format config validation against injection |
-| `validate_yaml_config(content)` | YAML config validation (pre-existing, extended) |
-
-### Nginx Security Headers
-
-The following security headers were added to the nginx reverse proxy configuration:
-
-- `Strict-Transport-Security` with `max-age=31536000; includeSubDomains`
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: SAMEORIGIN`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `X-XSS-Protection: 1; mode=block`
-- `Permissions-Policy` restricting camera, microphone, and geolocation
-- `client_max_body_size` reduced from 800M to 100M
-
-### Container Compatibility
-
-Entrypoint scripts (`entrypoint.sh`, `celery-entrypoint.sh`, `beat-entrypoint.sh`) have been updated with:
-
-- Backwards-compatible `gosu` detection (graceful fallback if not installed)
-- Automatic `tenacity` dependency upgrade for `langchain_core` compatibility
-- Non-root user execution via `gosu rengine` when available
-
-### Functional Bug Fixes
-
-| Issue | Root Cause | Fix | File(s) |
-|-------|-----------|-----|----------|
-| DataTables Ajax 400 error on large queries | Gunicorn default `limit-request-line` (8190 bytes) rejecting long query strings | Made `limit-request-line` configurable via `GUNICORN_LIMIT_REQUEST_LINE` env var (default 8190). Added `large_client_header_buffers 4 16k` to Nginx. | `entrypoint.sh`, `rengine.conf` |
-| VulnerabilityViewSet / EndPointViewSet crash | `search_value` was `None` when DataTables sent empty search, causing `AttributeError` on `.strip()` | Added `search_value = search_value or ''` guard before string operations | `api/views.py` |
-| Report generation 500 error | `pydyf>=0.12.0` broke `weasyprint==53.3` with `TypeError` on `Stream.compress()` | Pinned `pydyf>=0.5.0,<0.12.0` in `requirements.txt` | `requirements.txt` |
-| OpenAI SDK `module has no attribute 'OpenAI'` | `openai==0.28.0` used legacy API; code already used new `openai.OpenAI()` client pattern | Upgraded to `openai>=1.3.0,<2.0.0` | `requirements.txt` |
-| Scans stuck in RUNNING state indefinitely | Celery tasks completed but `ScanHistory` status not updated on certain error paths | Reset stuck tasks to SUCCESS, fixed status update logic | `tasks.py` |
-
-### LLM / Ollama Integration Improvements
-
-| Issue | Root Cause | Fix | File(s) |
-|-------|-----------|-----|----------|
-| Vulnerability descriptions never generated with Ollama | `fetch_gpt_report` set to `false` in Full Scan engine YAML | Updated default engine configuration to `fetch_gpt_report: true` | Database (EngineType) |
-| LLM report gatekeeper ignored Ollama | Three gatekeeper conditions only checked `OpenAiAPIKey`, blocking Ollama-only setups | Changed all 3 conditions (Nuclei, Dalfox, CRLFuzz) to: `if should_fetch_gpt_report and (OpenAiAPIKey or use_ollama)` | `tasks.py` |
-| Class name collision `LLMVulnerabilityReportGenerator` | API view class and LLM generator class had identical names | Renamed API view to `LLMVulnerabilityReportView` | `api/views.py`, `api/urls.py` |
-| Parser gagal parsing respons Ollama yang valid | `try/except` membungkus seluruh `for` loop di `parse_llm_vulnerability_report()`. Saat Ollama mengembalikan baris pembuka (mis. `"Vulnerability Report: ...\n\nDescription:\n..."`) sebelum section utama, `ValueError` muncul dan **seluruh parsing berhenti** → return dict kosong `{}` → `"Failed to parse LLM response"` | Pindahkan `try/except` ke **dalam loop** dengan `continue` pada `ValueError`, sehingga baris pembuka di-skip dan 4 section (Description, Impact, Remediation, References) tetap ter-parse | `common_func.py` |
-| Model Ollama di-reload setiap request (200-390 detik) | `OLLAMA_KEEP_ALIVE` default 5 menit → model llama3.1:8b (4.6 GB) di-unload setelah idle, setiap request baru memicu reload penuh pada CPU-only | Tambahkan `OLLAMA_KEEP_ALIVE=24h` dan `OLLAMA_NUM_PARALLEL=2` sebagai environment variable di Ollama container | `docker-compose.yml` |
-| Tidak ada error handling di path Ollama | `LLMVulnerabilityReportGenerator` dan `LLMAttackSuggestionGenerator` tidak punya `try/except` di path Ollama — exception dari `llm.invoke()` menyebabkan crash task Celery | Tambahkan `try/except` dengan logging error dan return `{'status': False, 'error': ...}` untuk kedua class | `llm.py` |
-| Tidak ada timeout pada Ollama client | `Ollama()` constructor tidak set `timeout` (default `None` / tanpa batas) — request bisa hang selamanya | Tambahkan `timeout=600` pada constructor `Ollama()` di kedua class (`LLMVulnerabilityReportGenerator` dan `LLMAttackSuggestionGenerator`) | `llm.py` |
-| Record `GPTVulnerabilityReport` kosong di database | Saat `get_vulnerability_description()` return `status=False`, task tetap memanggil `add_gpt_description_db()` dengan nilai `None` → record kosong memblokir retry (cache menemukan record tapi isinya kosong). Ditemukan **11 record kosong** dari 13 total | Tambahkan validasi: hanya simpan ke DB jika `response.status=True` **dan** `description` ada. Diperbaiki di 2 fungsi: `get_vulnerability_gpt_report()` (batch) dan `llm_vulnerability_description()` (individual) | `tasks.py` |
-| API view LLM tanpa timeout | `task.wait()` di `LLMVulnerabilityReportView` tanpa timeout → HTTP request bisa hang selamanya tanpa feedback | Tambahkan `task.wait(timeout=600)` dengan `try/except` yang return response error yang jelas | `api/views.py` |
-
-### Infrastructure & Deployment
-
-| Improvement | Description | File(s) |
-|-------------|-------------|----------|
-| 502 proxy race condition | Nginx started before Gunicorn was ready on first boot. Added healthcheck to web service and `depends_on: condition: service_healthy` for proxy. | `docker-compose.yml` |
-| Network binding unification | All service bindings (`db:5432`, `web:8000`, `ollama:11434`) unified to `0.0.0.0` for consistent LAN accessibility. | `docker-compose.yml`, `docker-compose.dev.yml` |
-| `ALLOWED_HOSTS` configurable | Changed from hardcoded list to `env.list('ALLOWED_HOSTS', default=['*'])` for easy LAN/VPN deployment. | `settings.py` |
-| Gunicorn request line limit | Made configurable via `GUNICORN_LIMIT_REQUEST_LINE` environment variable with sensible default. | `entrypoint.sh` |
-
-### Celery Entrypoint Network Resilience
-
-The `celery-entrypoint.sh` script performs ~15 network operations (git clone, pip install, wget, apt install) before starting workers. In VPN-only or air-gapped environments where external DNS is unavailable, this caused multi-hour startup delays or complete failure.
-
-Fixes applied:
-
-- Added `NETWORK_AVAILABLE` check at startup (DNS resolution test with 5-second timeout)
-- All network-dependent blocks (Firefox install, wordlist downloads, tool cloning, pip installs, Nuclei templates) wrapped in `if [ "$NETWORK_AVAILABLE" = true ]` conditionals
-- Added `--retries 1 --timeout 15` flags to all pip commands
-- Added `timeout 30/60` to wget and git clone commands
-- When no network: logs "Skipping..." messages and proceeds directly to starting Celery workers
-- Workers now start in ~10 seconds instead of hanging indefinitely in offline environments
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-<p align="center">
-  <h3>Enterprise Support</h3>
-</p>
-
-<p align="center">
-  <a href="https://hailbytes.com/hardened-ubuntu-rengine/" target="_blank">
-    <img src="https://hailbytes.com/wp-content/uploads/2020/04/HailBytes-Logo-2023-350-%C3%97-100-px.png" alt="HailBytes - Enterprise reNgine Support" height="60"/>
-  </a>
-</p>
-
-<p align="center">
-  Official enterprise-grade support, deployment, and maintenance services for reNgine are available through <a href="https://hailbytes.com">HailBytes</a>.
-</p>
-
-<p align="center">
-You can also find the deep dive video on how to use and install reNgine from here <a href="https://www.youtube.com/watch?v=C6BFBxLmZIA">reNgine Deep Dive by HailBytes</a>
-</p>
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Quick Installation
-
-### Quick Setup for Ubuntu/VPS
-
-1. Clone the repository
-
-    ```bash
-    git clone https://github.com/yogeshojha/rengine && cd rengine
-    ```
-
-1. Configure the environment
-
-    ```bash
-    nano .env
-    ```
-
-    **Ensure you change the `POSTGRES_PASSWORD` for security.**
-
-1. (Optional) For non-interactive install, set admin credentials in `.env`
-
-    ```bash
-    DJANGO_SUPERUSER_USERNAME=yourUsername
-    DJANGO_SUPERUSER_EMAIL=YourMail@example.com
-    DJANGO_SUPERUSER_PASSWORD=yourStrongPassword
-    ```
-    If you need to carry out a non-interactive installation, you can setup the login, email and password of the web interface admin directly from the .env file (instead of manually setting them from prompts during the installation process). This option can be interesting for automated installation (via ansible, vagrant, etc.).
-
-    * `DJANGO_SUPERUSER_USERNAME`: web interface admin username (used to login to the web interface).
-
-    * `DJANGO_SUPERUSER_EMAIL`: web interface admin email.
-
-    * `DJANGO_SUPERUSER_PASSWORD`: web interface admin password (used to login to the web interface).
-
-1. Adjust Celery worker scaling in `.env`
-
-    ```bash
-    MAX_CONCURRENCY=80
-    MIN_CONCURRENCY=10
-    ```
-
-    `MAX_CONCURRENCY`: This parameter specifies the maximum number of reNgine's concurrent Celery worker processes that can be spawned. In this case, it's set to 80, meaning that the application can utilize up to 80 concurrent worker processes to execute tasks concurrently. This is useful for handling a high volume of scans or when you want to scale up processing power during periods of high demand. If you have more CPU cores, you will need to increase this for maximised performance.
-
-    `MIN_CONCURRENCY`: On the other hand, MIN_CONCURRENCY specifies the minimum number of concurrent worker processes that should be maintained, even during periods of lower demand. In this example, it's set to 10, which means that even when there are fewer tasks to process, at least 10 worker processes will be kept running. This helps ensure that the application can respond promptly to incoming tasks without the overhead of repeatedly starting and stopping worker processes.
-
-    These settings allow for dynamic scaling of Celery workers, ensuring that the application efficiently manages its workload by adjusting the number of concurrent workers based on the workload's size and complexity.
-
-    Here is the ideal value for `MIN_CONCURRENCY` and `MAX_CONCURRENCY` depending on the number of RAM your machine has:
-
-    * 4GB: `MAX_CONCURRENCY=10`
-    * 8GB: `MAX_CONCURRENCY=30`
-    * 16GB: `MAX_CONCURRENCY=50`
-
-    This is just an ideal value which developers have tested and tried out and works! But feel free to play around with the values.
-    Maximum number of scans is determined by various factors, your network bandwidth, RAM, number of CPUs available. etc
-
-1. Run the installation script:
-
-    ```bash
-    sudo ./install.sh
-    ```
-
-    For non-interactive install: `sudo ./install.sh -n`
-
-    *Note: If needed, run `chmod +x install.sh` to grant execution permissions.*
-
-**reNgine can now be accessed from <https://127.0.0.1> or if you're on the VPS <https://your_vps_ip_address>**
-
-**Unless you are on development branch, please do not access reNgine via any ports**
-
-### Installation on Other Platforms
-
-For Mac, Windows, or other systems, refer to our detailed installation guide [https://reNgine.wiki/install/detailed/](https://reNgine.wiki/install/detailed/)
-
-### Installation Video Tutorial
-
-If you encounter any issues during installation or prefer a visual guide, one of our community members has created an excellent installation video for Kali Linux installation. You can find it here: [https://www.youtube.com/watch?v=7OFfrU6VrWw](https://www.youtube.com/watch?v=7OFfrU6VrWw)
-
-Please note: This is community-curated content and is not owned by reNgine. The installation process may change, so please refer to the official documentation for the most up-to-date instructions.
-
-## Updating
-
-1. To update reNgine, run:
-
-    ```bash
-    cd rengine &&  sudo ./update.sh
-    ```
-
-    If `update.sh` lacks execution permissions, use:
-
-    ```bash
-    sudo chmod +x update.sh
-    ```
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Community-Curated Videos
-
-reNgine has a vibrant community that often creates helpful content about installation, features, and usage. Below is a collection of community-curated videos that you might find useful. Please note that these videos are not official reNgine content, and the information they contain may become outdated as reNgine evolves.
-
-Always refer to the official documentation for the most up-to-date and accurate information. If you've created a video about reNgine and would like it featured here, please send a pull request updating this table.
-
-| Video Title | Language | Publisher | Date | Link |
-|-------------|----------|----------|------|------|
-| reNgine Installation on Kali Linux | English | Secure the Cyber World | 2024-02-29 | [Watch](https://www.youtube.com/watch?v=7OFfrU6VrWw) |
-| Resultados do ReNgine - Automação para Recon | Portuguese | Guia Anônima | 2023-04-18 | [Watch](https://www.youtube.com/watch?v=6aNvDy1FzIM) |
-| reNgine Introduction | Moroccan Arabic | Th3 Hacker News Bdarija | 2021-07-27 | [Watch](https://www.youtube.com/watch?v=9FuRrcmWgWU) |
-| Automated recon? ReNgine - Hacker Tools | English | Intigriti | 2021-08-24 | [Watch](https://www.youtube.com/watch?v=vP7tBopQSEc) |
-
-We appreciate the community's contributions in creating these resources.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-
-## Screenshots
-
-### Scan Results
-
-![](.github/screenshots/scan_results.gif)
-
-### General Usage
-
-<img src="https://user-images.githubusercontent.com/17223002/164993781-b6012995-522b-480a-a8bf-911193d35894.gif">
-
-### Initiating Subscan
-
-<img src="https://user-images.githubusercontent.com/17223002/164993749-1ad343d6-8ce7-43d6-aee7-b3add0321da7.gif">
-
-### Recon Data filtering
-
-<img src="https://user-images.githubusercontent.com/17223002/164993687-b63f3de8-e033-4ac0-808e-a2aa377d3cf8.gif">
-
-### Report Generation
-
-<img src="https://user-images.githubusercontent.com/17223002/164993689-c796c6cd-eb61-43f4-800d-08aba9740088.gif">
-
-### Toolbox
-
-<img src="https://user-images.githubusercontent.com/17223002/164993751-d687e88a-eb79-440f-9dc0-0ad006901620.gif">
-
-### Adding Custom tool in Tools Arsenal
-
-<img src="https://user-images.githubusercontent.com/17223002/164993670-466f6459-9499-498b-a9bd-526476d735a7.gif">
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Contributing
-
-We welcome contributions of all sizes! The open-source community thrives on collaboration, and your input is invaluable. Whether you're fixing a typo, improving UI, or adding new features, every contribution matters.
-
-How you can contribute:
-  * Code improvements
-  * Documentation updates
-  * Bug reports and fixes
-  * New feature suggestions and implementations
-  * UI/UX enhancements
-
-To get started:
-
-  1. Check our [Contributing Guide](.github/CONTRIBUTING.md)
-  2. Pick an [open issue](https://github.com/yogeshojha/rengine/issues) or propose a new one
-  3. Fork the repository and create your branch
-  4. Make your changes and submit a pull request
-
-Remember, no contribution is too small. Your efforts help make reNgine better for everyone!
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Submitting issues
-
-When submitting issues, provide as much valuable information as possible to help developers resolve the problem quickly. Follow these steps to gather detailed debug information:
-
-1. Enable Debug Mode:
-   - Edit `web/entrypoint.sh` in the project root
-   - Add `export DEBUG=1` at the top of the file:
-     ```bash
-     #!/bin/bash
-
-     export DEBUG=1
-
-     python3 manage.py migrate
-     python3 manage.py runserver 0.0.0.0:8000
-
-     exec "$@"
-     ```
-   - Restart the web container: `docker-compose restart web`
-
-2. View Debug Output:
-   - Run `make logs` to see the full stack trace
-   - Check the browser's developer console for XHR requests with 500 errors
-
-3. Example Debug Output:
-    ```
-    web_1          |   File "/usr/local/lib/python3.10/dist-packages/celery/app/task.py", line 411, in __call__
-    web_1          |     return self.run(*args, **kwargs)
-    web_1          | TypeError: run_command() got an unexpected keyword argument 'echo'
-    ```
-
-4. Submit Your Issue:
-    - Include the full stack trace in your GitHub issue
-    - Describe the steps to reproduce the problem
-    - Mention any relevant system information
-
-5. Disable Debug Mode:
-    - Set `DEBUG=0` in `web/entrypoint.sh`
-    - Restart the web container
-
-By providing this detailed information, you significantly help developers identify and fix issues more efficiently.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## First-time Open Source contributors
-
-reNgine is an open-source project that welcomes contributors of all experience levels, including beginners. If you've never contributed to open source before, we encourage you to start here!
-
-* We're proud to support your first Pull Request (PR)
-* Check our [open issues](https://github.com/yogeshojha/rengine/issues) for starter-friendly tasks
-* Don't hesitate to ask questions in our community channels
-
-Your contribution, no matter how small, is valuable to us.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## reNgine Support
-
-Before seeking support:
-
-* Please carefully read the README and documentation at [rengine.wiki](https://rengine.wiki).
-* Most common questions and issues are addressed there.
-
-If you still need assistance:
-
-* Do not use GitHub issues for support requests.
-* Join our [community-maintained Discord channel](https://discord.gg/azv6fzhNCE).
-
-Please note:
-* The Discord channel is maintained by the community.
-* While we strive to help, there's no guarantee of support or response time.
-* For confirmed bugs or feature requests, consider opening a GitHub issue.
-
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Support and Sponsoring
-
-reNgine is a passion project developed in my free time, alongside my day job. Your support helps keep this project alive and growing. Here's how you can contribute:
-
-* Add a [GitHub Star](https://github.com/yogeshojha/rengine) to the project.
-* Share about reNgine on social media or in blog posts
-* Nominate me for [GitHub Stars?](https://stars.github.com/nominate/)
-* Use my [DigitalOcean referral link](https://m.do.co/c/e353502d19fc) to get $100 credit (I receive $25)
-
-Your support, whether through donations or simply giving a star, tells me that reNgine is valuable to you. It motivates me to continue improving and adding features to make reNgine the go-to tool for reconnaissance.
-
-Thank you for your support!
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Reporting Security Vulnerabilities
-
-We appreciate your efforts to responsibly disclose your findings and will make every effort to acknowledge your contributions.
-
-To report a security vulnerability, please follow these steps:
-
-1. **Do Not** disclose the vulnerability publicly on GitHub issues or any other public forum.
-
-2. Go to the [Security tab](https://github.com/yogeshojha/rengine/security) of the reNgine repository.
-
-3. Click on "Report a vulnerability" to open GitHub's private vulnerability reporting form.
-
-4. Provide a detailed description of the vulnerability, including:
-   - Steps to reproduce
-   - Potential impact
-   - Any suggested fixes or mitigations (if you have them)
-
-5. I will review your report and respond as quickly as possible, usually within 48-72 hours.
-
-6. Please allow some time to investigate and address the vulnerability before disclosing it to others.
-
-We are committed to working with security researchers to verify and address any potential vulnerabilities reported to us. After fixing the issue, we will publicly acknowledge your responsible disclosure, unless you prefer to remain anonymous.
-
-Thank you for helping to keep reNgine and its users safe!
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## License
-
-Distributed under the GNU GPL v3 License. See [LICENSE](LICENSE) for more information.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-<p align="right"><i>Note: Parts of this README were written or refined using AI language models.</i></p>
+Untuk scan ulang domain atau subdomain tertentu tanpa menjalankan full scan:
+- Di halaman hasil scan, klik subdomain yang ingin di-subscan
+- Pilih jenis subscan (port scan, vulnerability scan, screenshot, dll)
+
+### Notifikasi
+
+Notifikasi aktif untuk:
+- Subdomain baru ditemukan
+- Kerentanan baru ditemukan
+- Commit baru di repository ini (via endpoint `/api/rengine/update/`)
+
+Notifikasi dari GitHub upstream reNgine (yogeshojha/rengine) telah dinonaktifkan.
+
+### Melihat Hasil HUMINT / SIGINT
+
+Hasil HUMINT dan SIGINT tersedia via REST API:
+
+| Endpoint | Isi |
+|----------|-----|
+| `/api/queryHumintEmployees/?scan_id=X` | Profil karyawan dari GitHub dan LinkedIn |
+| `/api/queryHumintGithub/?scan_id=X` | Hasil GitHub org recon |
+| `/api/queryHumintJobPostings/?scan_id=X` | Job posting dan tech stack |
+| `/api/querySigintAsn/?scan_id=X` | Daftar ASN dan CIDR ranges |
+| `/api/querySigintEmailSecurity/?scan_id=X` | SPF, DKIM, DMARC, risiko spoofing |
+| `/api/querySigintIntelligence/?scan_id=X` | IP, port terbuka, CVE dari Shodan |
+| `/api/querySigintCertificates/?scan_id=X&risk_only=1` | Sertifikat TLS dengan anomali |
+
+---
+
+## Instalasi
+
+### Prasyarat
+
+- Docker dan Docker Compose
+- Sistem operasi: Ubuntu 20.04+ / Debian / Kali Linux
+- RAM minimum: 4 GB (disarankan 8 GB+)
+
+### Langkah Instalasi
+
+```bash
+# 1. Clone repository
+git clone <url-repo-ini> reNgine-Custom && cd reNgine-Custom
+
+# 2. Konfigurasi environment
+cp .env.example .env
+nano .env
+# Minimal ubah: POSTGRES_PASSWORD
+
+# 3. (Opsional) Set admin pertama via .env
+# DJANGO_SUPERUSER_USERNAME=admin
+# DJANGO_SUPERUSER_EMAIL=admin@localhost
+# DJANGO_SUPERUSER_PASSWORD=password_kuat
+
+# 4. Jalankan installer
+sudo ./install.sh
+
+# Untuk instalasi tanpa interaksi (otomatis):
+sudo ./install.sh -n
+```
+
+Setelah selesai, akses via `https://localhost` atau `https://<IP-server>`.
+
+### Konfigurasi Worker Celery
+
+Edit `.env` untuk menyesuaikan kapasitas worker:
+
+| Variabel | Default | Keterangan |
+|----------|---------|-----------|
+| `MIN_CONCURRENCY` | 10 | Minimum worker aktif |
+| `MAX_CONCURRENCY` | 30 | Maximum worker bersamaan |
+
+Panduan berdasarkan RAM:
+- 4 GB RAM: `MAX_CONCURRENCY=10`
+- 8 GB RAM: `MAX_CONCURRENCY=30`
+- 16 GB RAM: `MAX_CONCURRENCY=50`
+
+### Pembaruan
+
+```bash
+cd reNgine-Custom && sudo ./update.sh
+```
+
+---
+
+## Riwayat Pembaruan
+
+Semua perubahan dilacak melalui git. Tabel di bawah mencatat riwayat commit sejak fork dimulai.
+
+| Commit | Tanggal | Perubahan |
+|--------|---------|-----------|
+| `f1a1e94` | 2026-03-09 | feat(osint): tambah HUMINT dan SIGINT, 7 model baru, migrasi 0005, 7 API endpoint baru |
+| `e455064` | 2026-03-09 | fix: perbaiki cakupan DAST CVE, tambah 2024, gunakan dir induk dast/cves/ |
+| `c9fe1c6` | 2026-03-09 | fix: hapus duplikat httpx; tambah 249 template DAST nuclei; proxy auto-fetch untuk GooFuzz |
+| `01584e6` | 2026-03-09 | fix: cegah scan stuck di "In Progress"; perbaiki visibilitas kolom screenshot |
+| `fd8e196` | 2026-03-08 | fix(dorking): deteksi blokir IP GooFuzz lalu skip; perbaiki tab screenshot; tambah bing ke theHarvester |
+| `5261844` | 2026-03-08 | feat: tambah task fetch_free_proxies (scrape proxy gratis dari 4 sumber) + tombol UI |
+| `67c7022` | 2026-03-08 | fix: crash osint job.get() dengan allow_join_result(); perbaiki log domain tidak valid |
+| `5e9752f` | 2026-03-08 | fix(osint): gunakan sumber theHarvester gratis saja (bukan -b all) |
+| `bc40df0` | 2026-03-08 | fix(deps): perbaiki konflik versi tenacity dengan langchain_core |
+| `ca742bd` | 2026-03-08 | fix(osint): perbaikan integrasi tool OSINT; nonaktifkan notifikasi update dari upstream reNgine |
+| `73ef07b` | 2026-03-07 | fix(osint): pin GooFuzz ke v1.2.6; tambah jq ke Dockerfile |
+| `a55bf8c` | 2026-03-07 | fix: perbaikan integrasi Ollama, report generation, dan beberapa fungsi umum |
+| `b81c587` | 2026-03-02 | fix: perbaikan konfigurasi Docker Compose (network binding, healthcheck) |
+| `b8601d5` | 2026-02-28 | fix: report generation 500 error (pin pydyf); perbaiki OpenAI module import |
+| `b97625c` | 2026-02-28 | feat: optimalkan Gunicorn; satukan network binding ke 0.0.0.0; tutup 7 celah keamanan HIGH |
+| `dc1efef` | 2026-02-28 | fix(gunicorn): naikkan limit-request-line ke 8190 untuk DataTables dengan query panjang |
+| `49e8e06` | 2026-02-27 | feat: fork awal reNgine-Custom; audit keamanan 27 temuan (2 CRITICAL, 7 HIGH, 10 MEDIUM, 8 LOW), semua diperbaiki; hardening Nginx |
+
+### Ringkasan Keamanan (Audit Awal)
+
+| Tingkat | Jumlah | Status |
+|---------|--------|--------|
+| CRITICAL | 2 | Semua diperbaiki |
+| HIGH | 7 | Semua diperbaiki |
+| MEDIUM | 10 | Semua diperbaiki |
+| LOW | 8 | Semua diperbaiki |
+| **Total** | **27** | **Semua diperbaiki** |
+
+Detail lengkap tersedia di [RENGINE_DEEP_AUDIT_V2.md](RENGINE_DEEP_AUDIT_V2.md).
+
+---
+
+Lisensi: [GPLv3](LICENSE)

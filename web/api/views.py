@@ -18,6 +18,7 @@ from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTT
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.cache import cache
+from django.conf import settings
 
 from dashboard.models import *
 from recon_note.models import *
@@ -1251,64 +1252,65 @@ class ListInterestingKeywords(APIView):
 
 
 class RengineUpdateCheck(APIView):
+	"""Cek apakah ada commit baru di repository lokal reNgine-Custom.
+
+	File web/reNgine/.repo_head diperbarui otomatis oleh git hook
+	post-commit setiap kali commit baru dibuat.  Endpoint ini membaca
+	hash HEAD tersebut, membandingkan dengan hash yang terakhir
+	dinotifikasikan (disimpan di Django cache), dan membuat in-app
+	notification hanya jika ada perubahan baru.
+
+	Tidak ada koneksi ke GitHub upstream maupun internet luar.
+	"""
+	CACHE_KEY = 'rengine_custom_last_notified_commit'
+
 	def get(self, request):
-		req = self.request
-		github_api = \
-			'https://api.github.com/repos/yogeshojha/rengine/releases'
-		response = requests.get(github_api).json()
-		if 'message' in response:
-			return Response({'status': False, 'message': 'RateLimited'})
+		import os as _os
 
-		return_response = {}
+		repo_head_file = _os.path.join(settings.BASE_DIR, 'reNgine', '.repo_head')
 
-		# get current version_number
-		# remove quotes from current_version
-		current_version = RENGINE_CURRENT_VERSION
+		if not _os.path.isfile(repo_head_file):
+			return Response({
+				'status': False,
+				'message': (
+					'File .repo_head tidak ditemukan. '
+					'Pastikan git hook post-commit sudah terpasang dan '
+					'pernah berjalan minimal sekali.'
+				),
+			})
 
-		# for consistency remove v from both if exists
-		latest_version = re.search(r'v(\d+\.)?(\d+\.)?(\*|\d+)',
-								   ((response[0]['name'
-								   ])[1:] if response[0]['name'][0] == 'v'
-									else response[0]['name']))
+		with open(repo_head_file) as f:
+			current_head = f.read().strip()
 
-		latest_version = latest_version.group(0) if latest_version else None
+		if not current_head:
+			return Response({'status': False, 'message': 'File .repo_head kosong.'})
 
-		if not latest_version:
-			latest_version = re.search(r'(\d+\.)?(\d+\.)?(\*|\d+)',
-										((response[0]['name'
-										])[1:] if response[0]['name'][0]
-										== 'v' else response[0]['name']))
-			if latest_version:
-				latest_version = latest_version.group(0)
+		last_notified = cache.get(self.CACHE_KEY)
 
-		return_response['status'] = True
-		return_response['latest_version'] = latest_version
-		return_response['current_version'] = current_version
+		is_new_commit = (last_notified != current_head)
 
-		# Guard against None latest_version
-		if not latest_version:
-			return_response['update_available'] = False
-			return Response(return_response)
-
-		is_version_update_available = version.parse(current_version) < version.parse(latest_version)
-
-		# Only create notification when update IS available
-		if is_version_update_available:
+		if is_new_commit and last_notified is not None:
+			# Ada commit baru sejak notifikasi terakhir
+			short_hash = current_head[:8]
 			create_inappnotification(
-				title='reNgine Update Available',
-				description=f'Update to version {latest_version} is available',
+				title='Commit baru di reNgine-Custom',
+				description=f'Commit terbaru: {short_hash}. Perbarui container jika perlu.',
 				notification_type=SYSTEM_LEVEL_NOTIFICATION,
 				project_slug=None,
-				icon='mdi-update',
-				redirect_link='https://github.com/yogeshojha/rengine/releases',
-				open_in_new_tab=True
+				icon='mdi-source-commit',
+				redirect_link='',
+				open_in_new_tab=False,
 			)
 
-		return_response['update_available'] = is_version_update_available
-		if is_version_update_available:
-			return_response['changelog'] = response[0]['body']
+		# Simpan hash saat ini agar perbandingan berikutnya valid
+		cache.set(self.CACHE_KEY, current_head, timeout=None)
 
-		return Response(return_response)
+		return Response({
+			'status': True,
+			'current_commit': current_head,
+			'last_notified_commit': last_notified,
+			'new_commit_detected': is_new_commit and last_notified is not None,
+		})
 
 
 class UninstallTool(APIView):
