@@ -3469,6 +3469,8 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 			activity_id=self.activity_id):
 
 		if not isinstance(line, dict):
+			if isinstance(line, str) and ('[FTL]' in line or '[ERR]' in line or 'proxies are dead' in line):
+				logger.warning(f'nuclei severity={severity}: {line.strip()}')
 			continue
 
 		results.append(line)
@@ -3768,6 +3770,20 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 		custom_headers.append(custom_header)
 	should_fetch_gpt_report = config.get(FETCH_GPT_REPORT, DEFAULT_GET_GPT_REPORT)
 	proxy = get_random_proxy()
+	# Verify proxy is reachable before passing to nuclei.
+	# Nuclei treats -proxy as mandatory: if the proxy is dead it exits with
+	# "[FTL] all proxies are dead" (exit code 1) instead of falling back to
+	# direct connection, silently producing 0 vulnerability findings.
+	if proxy:
+		import socket as _socket
+		import urllib.parse as _urlparse
+		_p = _urlparse.urlparse(proxy)
+		try:
+			_s = _socket.create_connection((_p.hostname, _p.port or 80), timeout=3)
+			_s.close()
+		except (OSError, _socket.timeout):
+			logger.warning(f'nuclei_scan: proxy {proxy} is unreachable — running without proxy')
+			proxy = ''
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
