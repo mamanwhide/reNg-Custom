@@ -502,27 +502,59 @@ def extract_path_from_url(url):
 
 
 def get_random_proxy():
-	"""Get a random proxy from the list of proxies input by user in the UI.
+	"""Get a working proxy from the list of proxies configured in the UI.
+
+	Tries up to 100 randomly-selected proxies in concurrent batches of 20
+	(each with a 2-second TCP connect timeout) and returns the first one that
+	is reachable.  This prevents tools from silently failing when a randomly
+	chosen proxy happens to be dead (as is common with large free-proxy lists).
 
 	Returns:
-		str: Proxy URL in http://IP:PORT format, or '' if no proxy defined or
-			use_proxy is False. Tools that need bare IP:PORT should strip the
-			scheme with proxy.split('://', 1)[-1].
+		str: Proxy URL in http://IP:PORT format, or '' if no proxy defined,
+			use_proxy is False, or no working proxy found.
+			Tools that need bare IP:PORT should strip the scheme with
+			proxy.split('://', 1)[-1].
 	"""
+	import socket as _socket
+	import urllib.parse as _up
+	import concurrent.futures as _cf
+
 	if not Proxy.objects.all().exists():
 		return ''
-	proxy = Proxy.objects.first()
-	if not proxy.use_proxy:
+	proxy_obj = Proxy.objects.first()
+	if not proxy_obj.use_proxy:
 		return ''
-	proxy_name = random.choice(proxy.proxies.splitlines()).strip()
-	# Ensure the proxy URL always has an http:// scheme.
-	# httpx, ffuf, katana, dalfox, subfinder, hakrawler, gospider all require
-	# a full URL like http://IP:PORT.  Tools that need bare IP:PORT (e.g.
-	# GooFuzz -r flag) should do: proxy.split('://', 1)[-1]
-	if proxy_name and '://' not in proxy_name:
-		proxy_name = 'http://' + proxy_name
-	logger.warning('Using proxy: ' + proxy_name)
-	return proxy_name
+
+	proxy_lines = [l.strip() for l in proxy_obj.proxies.splitlines() if l.strip()]
+	if not proxy_lines:
+		return ''
+
+	random.shuffle(proxy_lines)
+
+	def _check(name):
+		p_url = ('http://' + name) if '://' not in name else name
+		parsed = _up.urlparse(p_url)
+		try:
+			s = _socket.create_connection((parsed.hostname, parsed.port or 80), timeout=2)
+			s.close()
+			return p_url
+		except (OSError, _socket.timeout):
+			return None
+
+	# Try up to 100 proxies in batches of 20 to find the first working one.
+	# Each batch runs concurrently, taking at most 2 seconds per batch.
+	# Expected: ~2 seconds to find a working proxy (first batch).
+	for i in range(0, min(len(proxy_lines), 100), 20):
+		batch = proxy_lines[i:i + 20]
+		with _cf.ThreadPoolExecutor(max_workers=len(batch)) as pool:
+			results = list(pool.map(_check, batch))
+		for r in results:
+			if r:
+				logger.warning('Using proxy: ' + r)
+				return r
+
+	logger.warning('get_random_proxy: no working proxy found among first 100 candidates, running without proxy')
+	return ''
 
 def remove_ansi_escape_sequences(text):
 	# Regular expression to match ANSI escape sequences
