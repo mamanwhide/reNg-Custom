@@ -1000,3 +1000,49 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		model = Vulnerability
 		fields = '__all__'
 		depth = 2
+
+
+###############################################################################
+# HUMINT / SIGINT Serializers
+###############################################################################
+
+class HumintEmployeeProfileSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = HumintEmployeeProfile
+		fields = '__all__'
+
+
+class HumintGithubReconSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = HumintGithubRecon
+		fields = '__all__'
+
+
+class HumintJobPostingSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = HumintJobPosting
+		fields = '__all__'
+
+
+class SigintAsnRecordSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SigintAsnRecord
+		fields = '__all__'
+
+
+class SigintEmailSecuritySerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SigintEmailSecurity
+		fields = '__all__'
+
+
+class SigintIntelligenceRecordSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SigintIntelligenceRecord
+		fields = '__all__'
+
+
+class SigintCertificateRecordSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SigintCertificateRecord
+		fields = '__all__'

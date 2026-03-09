@@ -715,6 +715,70 @@ def osint(self, host=None, ctx=None, description=None):
 		)
 		grouped_tasks.append(_task)
 
+	# HUMINT — Human Intelligence sub-tasks
+	humint_config = config.get(OSINT_HUMINT, {})
+	if humint_config:
+		if humint_config.get(HUMINT_GITHUB_ORG, False):
+			grouped_tasks.append(humint_github_recon.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+		if humint_config.get(HUMINT_LINKEDIN, False):
+			grouped_tasks.append(humint_linkedin_recon.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+		if humint_config.get(HUMINT_JOB_POSTINGS, False):
+			grouped_tasks.append(humint_job_postings.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+
+	# SIGINT — Signals Intelligence sub-tasks
+	sigint_config = config.get(OSINT_SIGINT, {})
+	if sigint_config:
+		if sigint_config.get(SIGINT_ASN, False):
+			grouped_tasks.append(sigint_asn_recon.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+		if sigint_config.get(SIGINT_EMAIL_SECURITY, False):
+			grouped_tasks.append(sigint_email_security.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+		if sigint_config.get(SIGINT_PASSIVE_INTEL, False):
+			grouped_tasks.append(sigint_passive_intel.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+		if sigint_config.get(SIGINT_CERT_ANALYSIS, False):
+			grouped_tasks.append(sigint_cert_analysis.si(
+				config=config,
+				host=self.scan.domain.name,
+				scan_history_id=self.scan.id,
+				results_dir=self.results_dir,
+				ctx=ctx,
+			))
+
 	celery_group = group(grouped_tasks)
 	job = celery_group.apply_async()
 	# MED-06 fix: Use allow_join_result() to permit .get() inside a Celery 5 task.
@@ -822,6 +886,1045 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 	# results['creds'] = creds
 	# results['meta_info'] = meta_info
 	return results
+
+
+###############################################################################
+# HUMINT — Human Intelligence Tasks
+###############################################################################
+
+@app.task(name='humint_github_recon', bind=False, queue='osint_discovery_queue')
+def humint_github_recon(config, host, scan_history_id, results_dir, ctx=None):
+	"""Enumerate GitHub organization members, repos, and scan commit history
+	for accidentally leaked email addresses and credential patterns.
+
+	Uses only the unauthenticated GitHub API (/orgs/{org}/members,
+	/orgs/{org}/repos, /repos/{owner}/{repo}/commits) when no token is set,
+	falling back to the GITHUB_API_KEY setting when available.
+	"""
+	if ctx is None:
+		ctx = {}
+	import json as _json
+	import re as _re
+	import requests as _requests
+
+	logger.info(f'HUMINT GitHub Recon starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain = scan_history.domain
+	history_file = f'{results_dir}/commands.txt'
+
+	# Derive candidate org name from domain (e.g. "example.com" → "example")
+	from tldextract import extract as _tld_extract
+	tld = _tld_extract(host)
+	org_candidate = tld.domain  # most likely GitHub org name
+
+	# Build headers — use token if configured
+	token = None
+	try:
+		from django.conf import settings as _dj_settings
+		token = getattr(_dj_settings, 'GITHUB_API_KEY', None)
+	except Exception:
+		pass
+
+	headers = {'Accept': 'application/vnd.github+json'}
+	if token:
+		headers['Authorization'] = f'token {token}'
+
+	base_url = 'https://api.github.com'
+
+	result = HumintGithubRecon(
+		scan_history=scan_history,
+		target_domain=domain,
+		org_login=org_candidate,
+	)
+
+	# ── 1. Org lookup ──────────────────────────────────────────────────────
+	try:
+		r = _requests.get(f'{base_url}/orgs/{org_candidate}', headers=headers, timeout=15)
+		if r.ok:
+			org_data = r.json()
+			result.org_name = org_data.get('name', org_candidate)
+			result.org_description = org_data.get('description', '')[:500] if org_data.get('description') else ''
+			result.org_blog = (org_data.get('blog') or '')[:500] or None
+			result.org_location = (org_data.get('location') or '')[:200] or None
+			result.public_repos = org_data.get('public_repos', 0)
+			result.public_members = org_data.get('public_members', 0)
+			logger.info(f'HUMINT GitHub: org {org_candidate} found — {result.public_repos} repos')
+		else:
+			logger.info(f'HUMINT GitHub: org {org_candidate} not found (HTTP {r.status_code})')
+	except Exception as e:
+		logger.warning(f'HUMINT GitHub: org lookup failed: {e}')
+
+	# ── 2. Members ─────────────────────────────────────────────────────────
+	members = []
+	try:
+		r = _requests.get(
+			f'{base_url}/orgs/{org_candidate}/members',
+			headers=headers, params={'per_page': 100}, timeout=15)
+		if r.ok:
+			members = [m['login'] for m in r.json() if isinstance(m, dict)]
+			result.members_json = _json.dumps(members)
+			logger.info(f'HUMINT GitHub: {len(members)} public members found')
+	except Exception as e:
+		logger.warning(f'HUMINT GitHub: members fetch failed: {e}')
+
+	# ── 3. Public repos ────────────────────────────────────────────────────
+	repos = []
+	try:
+		r = _requests.get(
+			f'{base_url}/orgs/{org_candidate}/repos',
+			headers=headers, params={'per_page': 100, 'sort': 'updated'}, timeout=15)
+		if r.ok:
+			repos = [rp['name'] for rp in r.json() if isinstance(rp, dict)]
+			result.repos_json = _json.dumps(repos)
+			logger.info(f'HUMINT GitHub: {len(repos)} public repos found')
+	except Exception as e:
+		logger.warning(f'HUMINT GitHub: repos fetch failed: {e}')
+
+	# ── 4. Commit email harvesting (lightweight — only recent commits) ──────
+	email_pattern = _re.compile(r'[\w\.\-\+]+@[\w\.\-]+\.' + _re.escape(host.split('.')[-1]))
+	corp_email_pattern = _re.compile(
+		r'[\w\.\-\+]+@(?:' + _re.escape(host) + '|' + _re.escape(org_candidate) + r'[\w\.\-]*)',
+		_re.IGNORECASE)
+
+	found_emails = set()
+	# Only scan up to 5 most recently updated repos to stay within rate limits
+	for repo_name in repos[:5]:
+		try:
+			r = _requests.get(
+				f'{base_url}/repos/{org_candidate}/{repo_name}/commits',
+				headers=headers, params={'per_page': 50}, timeout=15)
+			if not r.ok:
+				continue
+			for commit in r.json():
+				if not isinstance(commit, dict):
+					continue
+				author = (commit.get('commit') or {}).get('author') or {}
+				email = author.get('email', '')
+				if email and corp_email_pattern.search(email):
+					found_emails.add(email)
+					# Save to Email model & link to scan
+					email_obj, _ = Email.objects.get_or_create(address=email)
+					scan_history.emails.add(email_obj)
+				# Also harvest from commit message
+				msg = (commit.get('commit') or {}).get('message', '')
+				for m in corp_email_pattern.findall(msg):
+					found_emails.add(m)
+		except Exception as e:
+			logger.debug(f'HUMINT GitHub: commit scan error for {repo_name}: {e}')
+
+	if found_emails:
+		result.emails_found = _json.dumps(list(found_emails))
+		logger.info(f'HUMINT GitHub: extracted {len(found_emails)} corp emails from commits')
+
+	# ── 5. Naive secret-pattern detection in README files ─────────────────
+	secret_patterns = [
+		_re.compile(r'(?:password|passwd|secret|token|api[_\-]?key)\s*[:=]\s*["\']?([^\s"\']{8,})', _re.IGNORECASE),
+		_re.compile(r'AKIA[0-9A-Z]{16}'),         # AWS access key
+		_re.compile(r'ghp_[0-9A-Za-z]{36}'),       # GitHub PAT
+		_re.compile(r'-----BEGIN (?:RSA |EC )?PRIVATE KEY'),
+	]
+	secrets_found = []
+	for repo_name in repos[:10]:
+		try:
+			readme_url = f'https://raw.githubusercontent.com/{org_candidate}/{repo_name}/HEAD/README.md'
+			r = _requests.get(readme_url, headers=headers, timeout=10)
+			if r.ok:
+				for pat in secret_patterns:
+					for m in pat.finditer(r.text):
+						secrets_found.append({'repo': repo_name, 'match': m.group(0)[:200]})
+		except Exception:
+			pass
+
+	if secrets_found:
+		result.secrets_found = True
+		result.secrets_json = _json.dumps(secrets_found)
+		logger.warning(f'HUMINT GitHub: {len(secrets_found)} potential secrets detected!')
+
+	result.save()
+
+	# Enrich Employee model from member list
+	for username in members[:50]:
+		try:
+			r = _requests.get(f'{base_url}/users/{username}', headers=headers, timeout=10)
+			if r.ok:
+				u = r.json()
+				name = u.get('name') or username
+				bio = (u.get('bio') or '')[:500]
+				emp, _ = HumintEmployeeProfile.objects.get_or_create(
+					scan_history=scan_history,
+					full_name=name,
+					defaults={
+						'target_domain': domain,
+						'github_url': u.get('html_url'),
+						'designation': bio,
+						'location': (u.get('location') or '')[:200],
+						'source': 'github',
+					}
+				)
+				# Also save to existing Employee model for UI compatibility
+				Employee.objects.get_or_create(
+					name=name,
+					defaults={'designation': bio}
+				)
+		except Exception:
+			pass
+
+	logger.info(f'HUMINT GitHub Recon complete for {host}')
+	return {
+		'org': org_candidate,
+		'members': len(members),
+		'repos': len(repos),
+		'emails': len(found_emails),
+		'secrets': len(secrets_found),
+	}
+
+
+@app.task(name='humint_linkedin_recon', bind=False, queue='osint_discovery_queue')
+def humint_linkedin_recon(config, host, scan_history_id, results_dir, ctx=None):
+	"""Enumerate employees and profiles via LinkedIn using
+	Google/Bing dorking of site:linkedin.com/in/ + company name.
+
+	Extracts: name, title/designation, LinkedIn URL.
+	Does NOT scrape LinkedIn directly — uses search engine results only.
+	"""
+	if ctx is None:
+		ctx = {}
+	import re as _re
+	import requests as _requests
+	from bs4 import BeautifulSoup
+
+	logger.info(f'HUMINT LinkedIn starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain = scan_history.domain
+
+	from tldextract import extract as _tld_extract
+	tld = _tld_extract(host)
+	company = tld.domain.replace('-', ' ').replace('_', ' ')
+
+	headers = {
+		'User-Agent': (
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+			'AppleWebKit/537.36 (KHTML, like Gecko) '
+			'Chrome/120.0.0.0 Safari/537.36'
+		),
+		'Accept-Language': 'en-US,en;q=0.9',
+	}
+
+	found_profiles = []
+	# Use Bing (more tolerant than Google for dorking)
+	queries = [
+		f'site:linkedin.com/in/ "{company}"',
+		f'site:linkedin.com/in/ "{host}" employee',
+	]
+
+	for query in queries:
+		try:
+			url = f'https://www.bing.com/search?q={_requests.utils.quote(query)}&count=50'
+			r = _requests.get(url, headers=headers, timeout=20)
+			if not r.ok:
+				continue
+			soup = BeautifulSoup(r.text, 'lxml')
+			for result in soup.find_all('li', class_='b_algo'):
+				link_tag = result.find('a')
+				if not link_tag:
+					continue
+				link = link_tag.get('href', '')
+				if 'linkedin.com/in/' not in link:
+					continue
+				title_text = link_tag.get_text(strip=True)
+				# Extract name and designation from snippet
+				snippet = result.find('p')
+				snippet_text = snippet.get_text(strip=True) if snippet else ''
+				# Heuristic: "Name - Title at Company | LinkedIn"
+				parts = title_text.split(' - ')
+				name = parts[0].strip() if parts else title_text
+				designation = parts[1].split('|')[0].strip() if len(parts) > 1 else ''
+				if name and name not in [p['name'] for p in found_profiles]:
+					found_profiles.append({
+						'name': name[:500],
+						'designation': designation[:500],
+						'linkedin_url': link[:500],
+						'source': 'linkedin_google_dork',
+					})
+		except Exception as e:
+			logger.debug(f'HUMINT LinkedIn: search error: {e}')
+
+	logger.info(f'HUMINT LinkedIn: found {len(found_profiles)} profiles for {host}')
+
+	for profile in found_profiles[:100]:
+		try:
+			# Save enriched profile
+			HumintEmployeeProfile.objects.get_or_create(
+				scan_history=scan_history,
+				full_name=profile['name'],
+				defaults={
+					'target_domain': domain,
+					'designation': profile['designation'],
+					'linkedin_url': profile['linkedin_url'],
+					'source': 'linkedin',
+				}
+			)
+			# Keep existing Employee model updated for UI
+			Employee.objects.get_or_create(
+				name=profile['name'],
+				defaults={'designation': profile['designation']}
+			)
+		except Exception as e:
+			logger.debug(f'HUMINT LinkedIn: save error: {e}')
+
+	return {'profiles_found': len(found_profiles)}
+
+
+@app.task(name='humint_job_postings', bind=False, queue='osint_discovery_queue')
+def humint_job_postings(config, host, scan_history_id, results_dir, ctx=None):
+	"""Scrape public job postings to extract technology stack intelligence.
+
+	Job postings reveal internal tools, languages, frameworks, and
+	infrastructure — critical for attack surface mapping.
+	Sources: Indeed, LinkedIn Jobs, Glassdoor (via Google dorking).
+	"""
+	if ctx is None:
+		ctx = {}
+	import re as _re
+	import requests as _requests
+	from bs4 import BeautifulSoup
+
+	logger.info(f'HUMINT Job Postings starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain = scan_history.domain
+
+	from tldextract import extract as _tld_extract
+	tld = _tld_extract(host)
+	company = tld.domain
+
+	# Technology keywords to extract from job descriptions
+	TECH_PATTERNS = [
+		# Languages
+		r'\b(Python|Java|JavaScript|TypeScript|Go|Golang|Rust|PHP|Ruby|C#|C\+\+|Scala|Kotlin|Swift)\b',
+		# Frameworks
+		r'\b(Django|Laravel|Spring|Rails|Express|React|Vue|Angular|Next\.js|FastAPI|Flask)\b',
+		# Databases
+		r'\b(PostgreSQL|MySQL|MongoDB|Redis|Elasticsearch|Cassandra|Oracle|MSSQL|MariaDB|DynamoDB)\b',
+		# Cloud/Infra
+		r'\b(AWS|Azure|GCP|Kubernetes|Docker|Terraform|Ansible|Jenkins|GitLab CI|GitHub Actions|Helm)\b',
+		# Security-relevant
+		r'\b(LDAP|Active Directory|SAML|OAuth|Okta|VPN|WAF|Palo Alto|Fortinet|Cisco|Splunk|SIEM)\b',
+		# Web servers
+		r'\b(Nginx|Apache|IIS|Tomcat|Jetty|HAProxy|Traefik|Caddy)\b',
+	]
+
+	headers = {
+		'User-Agent': (
+			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+			'AppleWebKit/537.36 (KHTML, like Gecko) '
+			'Chrome/120.0.0.0 Safari/537.36'
+		)
+	}
+
+	sources = [
+		('indeed', f'site:indeed.com "{company}" jobs'),
+		('linkedin', f'site:linkedin.com/jobs/view "{company}"'),
+		('glassdoor', f'site:glassdoor.com/job-listing "{company}"'),
+		('jobsdb', f'site:jobsdb.com "{company}"'),
+	]
+
+	all_techs = set()
+	total_jobs = 0
+
+	for source_name, query in sources:
+		try:
+			url = f'https://www.bing.com/search?q={_requests.utils.quote(query)}&count=20'
+			r = _requests.get(url, headers=headers, timeout=20)
+			if not r.ok:
+				continue
+			soup = BeautifulSoup(r.text, 'lxml')
+			for item in soup.find_all('li', class_='b_algo'):
+				link_tag = item.find('a')
+				title_el = item.find('h2')
+				snippet_el = item.find('p')
+				if not link_tag:
+					continue
+				job_url = link_tag.get('href', '')
+				job_title = title_el.get_text(strip=True) if title_el else ''
+				snippet = snippet_el.get_text(strip=True) if snippet_el else ''
+				combined_text = f'{job_title} {snippet}'
+				# Extract technologies
+				job_techs = []
+				for pat in TECH_PATTERNS:
+					for m in _re.finditer(pat, combined_text, _re.IGNORECASE):
+						t = m.group(0).strip()
+						job_techs.append(t)
+						all_techs.add(t)
+				if job_title:
+					try:
+						HumintJobPosting.objects.get_or_create(
+							scan_history=scan_history,
+							url=job_url[:1000] or 'unknown',
+							defaults={
+								'target_domain': domain,
+								'title': job_title[:500],
+								'company': company[:300],
+								'source': source_name,
+								'technologies': list(set(job_techs))[:20],
+								'raw_description': snippet[:2000],
+							}
+						)
+						total_jobs += 1
+					except Exception as e:
+						logger.debug(f'HUMINT Jobs: save error: {e}')
+		except Exception as e:
+			logger.debug(f'HUMINT Jobs: source {source_name} error: {e}')
+
+	logger.info(
+		f'HUMINT Job Postings: {total_jobs} postings, '
+		f'{len(all_techs)} technologies found for {host}: {", ".join(sorted(all_techs)[:20])}'
+	)
+	return {'jobs_found': total_jobs, 'technologies': list(all_techs)}
+
+
+###############################################################################
+# SIGINT — Signals Intelligence Tasks
+###############################################################################
+
+@app.task(name='sigint_asn_recon', bind=False, queue='osint_discovery_queue')
+def sigint_asn_recon(config, host, scan_history_id, results_dir, ctx=None):
+	"""Enumerate ASN, BGP prefixes, and CIDR ranges owned by the target
+	organization using:
+	  1. BGPView public REST API (no API key needed)
+	  2. amass intel -whois -d <domain>  (finds org-linked ASNs)
+	  3. ARIN/RIPE/APNIC RDAP lookup for IP ranges
+	"""
+	if ctx is None:
+		ctx = {}
+	import json as _json
+	import requests as _requests
+
+	logger.info(f'SIGINT ASN Recon starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain = scan_history.domain
+	history_file = f'{results_dir}/commands.txt'
+
+	from tldextract import extract as _tld_extract
+	tld = _tld_extract(host)
+	org_name = tld.domain
+
+	headers = {'User-Agent': 'reNgine-SIGINT/2.0'}
+	found_asns = []
+
+	# ── 1. BGPView: search by ORG name ─────────────────────────────────────
+	try:
+		r = _requests.get(
+			f'https://api.bgpview.io/search?query_term={_requests.utils.quote(org_name)}',
+			headers=headers, timeout=20)
+		if r.ok:
+			data = r.json().get('data', {})
+			for asn_info in (data.get('asns') or [])[:10]:
+				asn_num = asn_info.get('asn')
+				if not asn_num:
+					continue
+				found_asns.append({
+					'asn': f'AS{asn_num}',
+					'name': asn_info.get('name', ''),
+					'description': asn_info.get('description_short', ''),
+					'country': asn_info.get('country_code', ''),
+				})
+				logger.info(f'SIGINT ASN: found AS{asn_num} — {asn_info.get("name")}')
+	except Exception as e:
+		logger.warning(f'SIGINT ASN: BGPView search failed: {e}')
+
+	# ── 2. For each ASN, fetch its prefixes via BGPView ───────────────────
+	for asn_entry in found_asns:
+		asn_num = asn_entry['asn'].lstrip('AS')
+		try:
+			r = _requests.get(
+				f'https://api.bgpview.io/asn/{asn_num}/prefixes',
+				headers=headers, timeout=20)
+			if not r.ok:
+				continue
+			data = r.json().get('data', {})
+			v4 = [p['prefix'] for p in (data.get('ipv4_prefixes') or [])[:50]]
+			asn_entry['cidrs'] = v4
+			asn_entry['ip_count'] = sum(
+				2 ** (32 - int(p.split('/')[1])) for p in v4 if '/' in p)
+		except Exception as e:
+			logger.debug(f'SIGINT ASN: prefix fetch failed for {asn_entry["asn"]}: {e}')
+
+	# ── 3. Also run amass intel -whois ─────────────────────────────────────
+	amass_output = f'{results_dir}/sigint_amass_intel.txt'
+	try:
+		import shlex as _shlex
+		safe_host = _shlex.quote(host)
+		run_command(
+			f'amass intel -whois -d {safe_host} -o {amass_output} -silent',
+			shell=True,
+			history_file=history_file,
+			scan_id=scan_history_id,
+		)
+		if os.path.isfile(amass_output):
+			with open(amass_output) as f:
+				amass_lines = [l.strip() for l in f if l.strip()]
+			logger.info(f'SIGINT ASN: amass intel found {len(amass_lines)} related domains/IPs')
+	except Exception as e:
+		logger.warning(f'SIGINT ASN: amass intel failed: {e}')
+
+	# ── 4. Save records ────────────────────────────────────────────────────
+	saved = 0
+	for entry in found_asns:
+		try:
+			SigintAsnRecord.objects.get_or_create(
+				scan_history=scan_history,
+				asn=entry['asn'],
+				defaults={
+					'target_domain': domain,
+					'org_name': entry.get('name', '')[:300],
+					'country': entry.get('country', '')[:100],
+					'registry': 'bgpview',
+					'cidr_ranges': entry.get('cidrs', [])[:50],
+					'ip_count': entry.get('ip_count', 0),
+				}
+			)
+			saved += 1
+		except Exception as e:
+			logger.debug(f'SIGINT ASN: save error: {e}')
+
+	logger.info(f'SIGINT ASN Recon complete — {saved} ASN records saved for {host}')
+	return {'asns_found': saved, 'records': [e['asn'] for e in found_asns]}
+
+
+@app.task(name='sigint_email_security', bind=False, queue='osint_discovery_queue')
+def sigint_email_security(config, host, scan_history_id, results_dir, ctx=None):
+	"""Analyze email security posture of the target domain:
+	  - SPF record validation and policy strength
+	  - DMARC record analysis and enforcement level
+	  - DKIM selector probing (common selectors)
+	  - MX record discovery and mail provider fingerprinting
+	  - Spoofing risk assessment
+
+	High-value output: weak DMARC/SPF = target is spoofable for phishing.
+	"""
+	if ctx is None:
+		ctx = {}
+	import json as _json
+	import dns.resolver as _dns
+
+	logger.info(f'SIGINT Email Security starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain_obj = scan_history.domain
+
+	# Also check root domain if host is a subdomain
+	from tldextract import extract as _tld_extract
+	tld = _tld_extract(host)
+	root_domain = f'{tld.domain}.{tld.suffix}'
+
+	domains_to_check = list(dict.fromkeys([host, root_domain]))  # dedup, preserve order
+
+	DKIM_SELECTORS = [
+		'default', 'selector1', 'selector2', 'google', 'mail', 'email',
+		'dkim', 'k1', 'k2', 's1', 's2', 'smtp', 'mandrill', 'sendgrid',
+		'mailchimp', 'amazonses', 'pm', 'key1', 'key2', 'zoho',
+	]
+
+	MAIL_PROVIDER_FINGERPRINTS = {
+		'google': 'Google Workspace',
+		'googlemail': 'Google Workspace',
+		'outlook': 'Microsoft 365',
+		'hotmail': 'Microsoft 365',
+		'protection.outlook': 'Microsoft 365',
+		'mimecast': 'Mimecast',
+		'pphosted': 'Proofpoint',
+		'barracuda': 'Barracuda',
+		'sendgrid': 'SendGrid',
+		'mailchimp': 'Mailchimp/Mandrill',
+		'amazonses': 'Amazon SES',
+		'zoho': 'Zoho Mail',
+		'yandex': 'Yandex Mail',
+	}
+
+	for domain_str in domains_to_check:
+		record = SigintEmailSecurity(
+			scan_history=scan_history,
+			target_domain=domain_obj,
+			domain_checked=domain_str,
+		)
+
+		# ── SPF ─────────────────────────────────────────────────────────
+		try:
+			answers = _dns.resolve(domain_str, 'TXT', lifetime=8)
+			for rdata in answers:
+				txt = str(rdata).strip('"')
+				if txt.startswith('v=spf1'):
+					record.spf_record = txt[:2000]
+					record.spf_valid = True
+					if '-all' in txt:
+						record.spf_policy = 'fail'
+					elif '~all' in txt:
+						record.spf_policy = 'softfail'
+					elif '?all' in txt:
+						record.spf_policy = 'neutral'
+					elif '+all' in txt:
+						record.spf_policy = 'pass_all'  # dangerous!
+					else:
+						record.spf_policy = 'none'
+					break
+		except Exception:
+			record.spf_valid = False
+			record.spf_policy = 'none'
+
+		# ── DMARC ───────────────────────────────────────────────────────
+		try:
+			dmarc_domain = f'_dmarc.{domain_str}'
+			answers = _dns.resolve(dmarc_domain, 'TXT', lifetime=8)
+			for rdata in answers:
+				txt = str(rdata).strip('"')
+				if 'v=DMARC1' in txt:
+					record.dmarc_record = txt[:2000]
+					record.dmarc_valid = True
+					if 'p=reject' in txt:
+						record.dmarc_policy = 'reject'
+					elif 'p=quarantine' in txt:
+						record.dmarc_policy = 'quarantine'
+					else:
+						record.dmarc_policy = 'none'
+					import re as _re
+					pct_m = _re.search(r'pct=(\d+)', txt)
+					record.dmarc_pct = int(pct_m.group(1)) if pct_m else 100
+					break
+		except Exception:
+			record.dmarc_valid = False
+			record.dmarc_policy = 'none'
+
+		# ── DKIM selectors probe ────────────────────────────────────────
+		found_selectors = []
+		dkim_records = {}
+		for sel in DKIM_SELECTORS:
+			try:
+				dkim_domain = f'{sel}._domainkey.{domain_str}'
+				answers = _dns.resolve(dkim_domain, 'TXT', lifetime=5)
+				for rdata in answers:
+					txt = str(rdata).strip('"')
+					if 'p=' in txt or 'v=DKIM1' in txt:
+						found_selectors.append(sel)
+						dkim_records[sel] = txt[:500]
+						break
+			except Exception:
+				pass
+		record.dkim_selectors = found_selectors
+		record.dkim_records = _json.dumps(dkim_records)
+
+		# ── MX records & mail provider ──────────────────────────────────
+		mx_list = []
+		try:
+			answers = _dns.resolve(domain_str, 'MX', lifetime=8)
+			for rdata in answers:
+				mx_host = str(rdata.exchange).rstrip('.').lower()
+				mx_list.append({'priority': rdata.preference, 'host': mx_host})
+			record.mx_records = _json.dumps(mx_list)
+			# Fingerprint mail provider
+			all_mx = ' '.join(m['host'] for m in mx_list)
+			for pattern, provider in MAIL_PROVIDER_FINGERPRINTS.items():
+				if pattern in all_mx:
+					record.mail_provider = provider
+					break
+		except Exception:
+			pass
+
+		# ── Spoofing risk assessment ────────────────────────────────────
+		reasons = []
+		risk = 'low'
+		if not record.spf_valid:
+			reasons.append('No SPF record')
+			risk = 'high'
+		elif record.spf_policy in ('none', 'pass_all', 'neutral'):
+			reasons.append(f'Weak SPF policy: {record.spf_policy}')
+			risk = 'high' if record.spf_policy == 'pass_all' else 'medium'
+		if not record.dmarc_valid:
+			reasons.append('No DMARC record')
+			risk = 'high'
+		elif record.dmarc_policy == 'none':
+			reasons.append('DMARC policy=none (monitoring only, not enforcing)')
+			if risk != 'high':
+				risk = 'medium'
+		elif record.dmarc_policy == 'quarantine' and (record.dmarc_pct or 100) < 100:
+			reasons.append(f'DMARC quarantine only {record.dmarc_pct}% of messages')
+			if risk != 'high':
+				risk = 'medium'
+		if not found_selectors:
+			reasons.append('No DKIM selectors found')
+
+		record.spoofing_risk = risk
+		record.risk_reasons = '; '.join(reasons) if reasons else 'Email security posture is strong'
+
+		logger.info(
+			f'SIGINT Email Security: {domain_str} — '
+			f'SPF:{record.spf_policy} DMARC:{record.dmarc_policy} '
+			f'Risk:{risk}'
+		)
+
+		try:
+			record.save()
+		except Exception as e:
+			logger.warning(f'SIGINT Email Security: save error for {domain_str}: {e}')
+
+	return {
+		'domains_checked': domains_to_check,
+		'high_risk': [d for d in domains_to_check if
+			SigintEmailSecurity.objects.filter(
+				scan_history=scan_history, domain_checked=d, spoofing_risk='high').exists()]
+	}
+
+
+@app.task(name='sigint_passive_intel', bind=False, queue='osint_discovery_queue')
+def sigint_passive_intel(config, host, scan_history_id, results_dir, ctx=None):
+	"""Collect passive threat intelligence from Shodan and Censys
+	for all IP addresses already discovered for this scan.
+
+	Requires:
+	  - SHODAN_API_KEY in Django settings (for Shodan)
+	  - CENSYS_API_ID + CENSYS_API_SECRET (for Censys)
+	Falls back gracefully when keys are not configured.
+	"""
+	if ctx is None:
+		ctx = {}
+	import json as _json
+
+	logger.info(f'SIGINT Passive Intel starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain_obj = scan_history.domain
+
+	from django.conf import settings as _dj_s
+
+	shodan_key = getattr(_dj_s, 'SHODAN_API_KEY', None)
+	censys_id = getattr(_dj_s, 'CENSYS_API_ID', None)
+	censys_secret = getattr(_dj_s, 'CENSYS_API_SECRET', None)
+
+	# Collect unique IPs from this scan
+	ip_qs = IpAddress.objects.filter(
+		subdomain__scan_history=scan_history
+	).values_list('address', flat=True).distinct()
+	ips = [ip for ip in ip_qs if ip and not ip.startswith(('10.', '172.', '192.168.', '127.'))]
+
+	if not ips:
+		logger.info(f'SIGINT Passive Intel: no external IPs found for scan, skipping')
+		return {'ips_queried': 0}
+
+	saved = 0
+
+	# ── Shodan ──────────────────────────────────────────────────────────────
+	if shodan_key:
+		try:
+			import shodan as _shodan
+			api = _shodan.Shodan(shodan_key)
+			for ip in ips[:20]:  # respect rate limits
+				try:
+					host_info = api.host(ip)
+					open_ports = host_info.get('ports', [])
+					services = {}
+					vulns = list(host_info.get('vulns', {}).keys())
+					for item in host_info.get('data', []):
+						port = item.get('port')
+						if port:
+							services[str(port)] = {
+								'transport': item.get('transport', 'tcp'),
+								'product': item.get('product', ''),
+								'version': item.get('version', ''),
+								'banner': (item.get('data') or '')[:200],
+							}
+					SigintIntelligenceRecord.objects.get_or_create(
+						scan_history=scan_history,
+						ip_address=ip,
+						source='shodan',
+						defaults={
+							'target_domain': domain_obj,
+							'hostname': (host_info.get('hostnames') or [''])[0][:500],
+							'org': (host_info.get('org') or '')[:300],
+							'isp': (host_info.get('isp') or '')[:300],
+							'country': (host_info.get('country_name') or '')[:100],
+							'city': (host_info.get('city') or '')[:100],
+							'asn': (host_info.get('asn') or '')[:30],
+							'os': (host_info.get('os') or '')[:200],
+							'last_update': (host_info.get('last_update') or '')[:50],
+							'open_ports': open_ports[:50],
+							'services_json': _json.dumps(services),
+							'vulns_json': _json.dumps(vulns),
+							'tags': list(host_info.get('tags') or [])[:20],
+							'is_cloud': any(k in (host_info.get('org') or '').lower()
+								for k in ['amazon', 'google', 'microsoft', 'alibaba', 'cloudflare']),
+						}
+					)
+					saved += 1
+				except Exception as se:
+					logger.debug(f'SIGINT Shodan: query failed for {ip}: {se}')
+			logger.info(f'SIGINT Shodan: queried {len(ips)} IPs, saved {saved} records')
+		except Exception as e:
+			logger.warning(f'SIGINT Shodan: initialization failed: {e}')
+
+	# ── Censys ──────────────────────────────────────────────────────────────
+	if censys_id and censys_secret and not shodan_key:
+		try:
+			from censys.search import CensysHosts
+			h = CensysHosts(api_id=censys_id, api_secret=censys_secret)
+			for ip in ips[:10]:
+				try:
+					result = h.view(ip)
+					services = {}
+					open_ports = []
+					for svc in result.get('services', []):
+						port = svc.get('port')
+						if port:
+							open_ports.append(port)
+							services[str(port)] = {
+								'transport': svc.get('transport_protocol', 'TCP'),
+								'service': svc.get('service_name', ''),
+								'banner': (svc.get('banner') or '')[:200],
+							}
+					SigintIntelligenceRecord.objects.get_or_create(
+						scan_history=scan_history,
+						ip_address=ip,
+						source='censys',
+						defaults={
+							'target_domain': domain_obj,
+							'org': (result.get('autonomous_system', {}).get('name') or '')[:300],
+							'country': (result.get('location', {}).get('country') or '')[:100],
+							'city': (result.get('location', {}).get('city') or '')[:100],
+							'asn': str(result.get('autonomous_system', {}).get('asn') or '')[:30],
+							'open_ports': open_ports[:50],
+							'services_json': _json.dumps(services),
+							'tags': list(result.get('labels') or [])[:20],
+						}
+					)
+					saved += 1
+				except Exception as ce:
+					logger.debug(f'SIGINT Censys: query failed for {ip}: {ce}')
+		except Exception as e:
+			logger.warning(f'SIGINT Censys: initialization failed: {e}')
+
+	# ── Fallback: Shodan InternetDB (no API key, rate-limited) ───────────
+	if not shodan_key and not (censys_id and censys_secret):
+		import requests as _requests
+		logger.info('SIGINT Passive Intel: no API keys — using Shodan InternetDB (limited)')
+		for ip in ips[:10]:
+			try:
+				r = _requests.get(
+					f'https://internetdb.shodan.io/{ip}',
+					timeout=10,
+					headers={'User-Agent': 'reNgine-SIGINT/2.0'})
+				if r.ok:
+					d = r.json()
+					SigintIntelligenceRecord.objects.get_or_create(
+						scan_history=scan_history,
+						ip_address=ip,
+						source='shodan_idb',
+						defaults={
+							'target_domain': domain_obj,
+							'hostname': (d.get('hostnames') or [''])[0][:500] if d.get('hostnames') else '',
+							'open_ports': (d.get('ports') or [])[:50],
+							'tags': (d.get('tags') or [])[:20],
+							'vulns_json': _json.dumps(d.get('vulns') or []),
+						}
+					)
+					saved += 1
+			except Exception as e:
+				logger.debug(f'SIGINT InternetDB: {ip} failed: {e}')
+
+	logger.info(f'SIGINT Passive Intel complete — {saved} records for {host}')
+	return {'ips_queried': len(ips), 'records_saved': saved}
+
+
+@app.task(name='sigint_cert_analysis', bind=False, queue='osint_discovery_queue')
+def sigint_cert_analysis(config, host, scan_history_id, results_dir, ctx=None):
+	"""Deep SSL/TLS certificate analysis for all discovered subdomains.
+
+	For each subdomain with a known HTTP endpoint, perform:
+	  1. Live TLS handshake — extract full cert chain info
+	  2. CT log enrichment via crt.sh API — find extra SANs / older certs
+	  3. Anomaly detection:
+	     - Expired or near-expiry certificates (< 30 days)
+	     - Self-signed certificates
+	     - Weak algorithms (SHA1, MD5, 512-bit keys)
+	     - Wildcard certificates
+	     - Mismatched SAN domains (scope expansion)
+	"""
+	if ctx is None:
+		ctx = {}
+	import json as _json
+	import ssl as _ssl
+	import socket as _socket
+	import datetime as _dt
+	import requests as _requests
+	from cryptography import x509 as _x509
+	from cryptography.hazmat.backends import default_backend as _default_backend
+	from cryptography.hazmat.primitives import hashes as _hashes
+
+	logger.info(f'SIGINT Cert Analysis starting for {host}')
+	scan_history = ScanHistory.objects.get(pk=scan_history_id)
+	domain_obj = scan_history.domain
+
+	# Gather subdomains for this scan
+	subdomains = Subdomain.objects.filter(
+		scan_history=scan_history).values_list('name', flat=True)
+
+	saved = 0
+	all_san_domains = set()
+
+	def analyze_cert(hostname, port=443):
+		"""Fetch and analyze a TLS certificate, return parsed dict."""
+		ctx_ssl = _ssl.create_default_context()
+		ctx_ssl.check_hostname = False
+		ctx_ssl.verify_mode = _ssl.CERT_NONE
+		try:
+			with _socket.create_connection((hostname, port), timeout=8) as sock:
+				with ctx_ssl.wrap_socket(sock, server_hostname=hostname) as ssock:
+					der = ssock.getpeercert(binary_form=True)
+		except Exception as e:
+			return None, str(e)
+
+		try:
+			cert = _x509.load_der_x509_certificate(der, _default_backend())
+		except Exception as e:
+			return None, str(e)
+
+		now = _dt.datetime.now(_dt.timezone.utc)
+		# Support both cryptography < 42 (not_valid_after) and >= 42 (not_valid_after_utc)
+		try:
+			not_after = cert.not_valid_after_utc
+			not_before = cert.not_valid_before_utc
+		except AttributeError:
+			not_after = cert.not_valid_after.replace(tzinfo=_dt.timezone.utc)
+			not_before = cert.not_valid_before.replace(tzinfo=_dt.timezone.utc)
+		days_to_expiry = (not_after - now).days
+
+		# Subject fields
+		cn = None
+		for attr in cert.subject:
+			if attr.oid == _x509.NameOID.COMMON_NAME:
+				cn = attr.value
+				break
+
+		# Issuer
+		issuer_cn = None
+		issuer_org = None
+		for attr in cert.issuer:
+			if attr.oid == _x509.NameOID.COMMON_NAME:
+				issuer_cn = attr.value
+			if attr.oid == _x509.NameOID.ORGANIZATION_NAME:
+				issuer_org = attr.value
+
+		# SAN
+		san_list = []
+		try:
+			san_ext = cert.extensions.get_extension_for_oid(
+				_x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+			san_list = [n.value for n in san_ext.value if isinstance(n, _x509.DNSName)]
+		except Exception:
+			pass
+
+		# Key info
+		pub_key = cert.public_key()
+		key_algo = type(pub_key).__name__.replace('_RSAPublicKey', 'RSA').replace('_EllipticCurvePublicKey', 'EC').replace('_DSAPublicKey', 'DSA')
+		key_bits = None
+		try:
+			key_bits = pub_key.key_size
+		except AttributeError:
+			pass
+
+		# Fingerprint
+		fp = cert.fingerprint(_hashes.SHA256()).hex()
+
+		# Anomaly checks
+		is_self_signed = (cert.subject == cert.issuer)
+		is_wildcard = any('*.' in s for s in san_list + ([cn] if cn else []))
+		sig_algo = cert.signature_algorithm_oid.dotted_string
+		uses_deprecated = 'sha1' in (cert.signature_hash_algorithm.name if cert.signature_hash_algorithm else '').lower()
+
+		return {
+			'common_name': (cn or '')[:500],
+			'issuer': (issuer_cn or '')[:500],
+			'issuer_org': (issuer_org or '')[:300],
+			'san_domains': san_list[:50],
+			'not_before': not_before,
+			'not_after': not_after,
+			'is_expired': days_to_expiry < 0,
+			'days_to_expiry': days_to_expiry,
+			'cert_fingerprint': fp[:200],
+			'serial_number': str(cert.serial_number)[:200],
+			'key_algorithm': key_algo[:50],
+			'key_bits': key_bits,
+			'is_self_signed': is_self_signed,
+			'is_wildcard': is_wildcard,
+			'uses_deprecated_algo': uses_deprecated,
+		}, None
+
+	# Analyze each subdomain
+	for subdomain_name in list(subdomains)[:50]:
+		parsed, err = analyze_cert(subdomain_name)
+		if not parsed:
+			logger.debug(f'SIGINT Cert: {subdomain_name} TLS failed: {err}')
+			continue
+		try:
+			rec, created = SigintCertificateRecord.objects.get_or_create(
+				scan_history=scan_history,
+				source_host=subdomain_name,
+				cert_fingerprint=parsed['cert_fingerprint'],
+				defaults={
+					'target_domain': domain_obj,
+					'source_port': 443,
+					**{k: v for k, v in parsed.items() if k not in ('cert_fingerprint',)},
+				}
+			)
+			if created:
+				saved += 1
+				all_san_domains.update(parsed['san_domains'])
+				if parsed['is_expired']:
+					logger.warning(f'SIGINT Cert: EXPIRED cert on {subdomain_name}!')
+				elif parsed['days_to_expiry'] < 30:
+					logger.warning(f'SIGINT Cert: cert on {subdomain_name} expires in {parsed["days_to_expiry"]} days!')
+				if parsed['is_self_signed']:
+					logger.warning(f'SIGINT Cert: SELF-SIGNED cert on {subdomain_name}')
+		except Exception as e:
+			logger.debug(f'SIGINT Cert: save error for {subdomain_name}: {e}')
+
+	# CT log enrichment via crt.sh — finds certs from history
+	try:
+		r = _requests.get(
+			f'https://crt.sh/?q=%.{host}&output=json',
+			timeout=20,
+			headers={'User-Agent': 'reNgine-SIGINT/2.0'})
+		if r.ok:
+			ct_entries = r.json()
+			for entry in ct_entries[:200]:
+				name_value = entry.get('name_value', '')
+				for name in name_value.split('\n'):
+					name = name.strip().lstrip('*.')
+					if name and name not in all_san_domains and name.endswith(host):
+						all_san_domains.add(name)
+			logger.info(f'SIGINT Cert: CT log found {len(ct_entries)} cert entries for {host}')
+	except Exception as e:
+		logger.warning(f'SIGINT Cert: crt.sh query failed: {e}')
+
+	# Save any newly discovered SAN domains as subdomains
+	new_sub_count = 0
+	for san in all_san_domains:
+		if san.endswith(host) and san != host:
+			try:
+				subdomain_obj, created = Subdomain.objects.get_or_create(
+					name=san,
+					scan_history=scan_history,
+					defaults={'target_domain': domain_obj}
+				)
+				if created:
+					new_sub_count += 1
+			except Exception:
+				pass
+
+	logger.info(
+		f'SIGINT Cert Analysis complete: {saved} certs analyzed, '
+		f'{new_sub_count} new subdomains from SANs for {host}'
+	)
+	return {
+		'certs_analyzed': saved,
+		'new_subdomains_from_san': new_sub_count,
+		'unique_sans': len(all_san_domains),
+	}
 
 
 @app.task(name='dorking', bind=False, queue='dorking_queue')

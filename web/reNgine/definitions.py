@@ -60,6 +60,15 @@ OSINT_DOCUMENTS_LIMIT = 'documents_limit'
 OSINT_DISCOVER = 'discover'
 OSINT_DORK = 'dorks'
 OSINT_CUSTOM_DORK = 'custom_dorks'
+OSINT_HUMINT = 'humint'
+OSINT_SIGINT = 'sigint'
+HUMINT_GITHUB_ORG = 'github_org'
+HUMINT_LINKEDIN = 'linkedin'
+HUMINT_JOB_POSTINGS = 'job_postings'
+SIGINT_ASN = 'asn_recon'
+SIGINT_EMAIL_SECURITY = 'email_security'
+SIGINT_PASSIVE_INTEL = 'passive_intel'
+SIGINT_CERT_ANALYSIS = 'cert_analysis'
 PORT = 'port'
 PORTS = 'ports'
 RECURSIVE = 'recursive'
@@ -184,7 +193,18 @@ OSINT_DEFAULT_DORKS = [
 ]
 OSINT_DEFAULT_CONFIG = {
     'discover': OSINT_DEFAULT_LOOKUPS,
-    'dork': OSINT_DEFAULT_DORKS
+    'dork': OSINT_DEFAULT_DORKS,
+    'humint': {
+        'github_org': True,
+        'linkedin': True,
+        'job_postings': True,
+    },
+    'sigint': {
+        'asn_recon': True,
+        'email_security': True,
+        'passive_intel': False,  # requires Shodan/Censys API key
+        'cert_analysis': True,
+    },
 }
 
 # subdomain scan

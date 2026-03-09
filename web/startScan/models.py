@@ -698,3 +698,260 @@ class S3Bucket(models.Model):
 	perm_all_users_full_control = models.IntegerField(default=0)
 	num_objects = models.IntegerField(default=0)
 	size = models.IntegerField(default=0)
+
+
+###############################################################################
+# HUMINT — Human Intelligence Models
+###############################################################################
+
+class HumintEmployeeProfile(models.Model):
+	"""Extended employee profile enriched from multiple OSINT sources."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='humint_employees')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+
+	# Identity
+	full_name = models.CharField(max_length=500, null=True, blank=True)
+	first_name = models.CharField(max_length=200, null=True, blank=True)
+	last_name = models.CharField(max_length=200, null=True, blank=True)
+	designation = models.CharField(max_length=500, null=True, blank=True)
+	department = models.CharField(max_length=200, null=True, blank=True)
+	location = models.CharField(max_length=200, null=True, blank=True)
+
+	# Contact vectors
+	email = models.CharField(max_length=300, null=True, blank=True)
+	email_pattern = models.CharField(max_length=100, null=True, blank=True)  # e.g. {f}{last}@company.com
+
+	# Social presence
+	linkedin_url = models.URLField(max_length=500, null=True, blank=True)
+	github_url = models.URLField(max_length=500, null=True, blank=True)
+	twitter_url = models.URLField(max_length=500, null=True, blank=True)
+
+	# Source
+	source = models.CharField(max_length=100, null=True, blank=True)  # linkedin/github/harvester
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'HUMINT Employee Profile'
+		unique_together = [('scan_history', 'full_name', 'email')]
+
+	def __str__(self):
+		return f'{self.full_name} [{self.designation}] — {self.source}'
+
+
+class HumintGithubRecon(models.Model):
+	"""GitHub org/repo recon results."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='humint_github_recon')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+
+	# Org info
+	org_login = models.CharField(max_length=200, null=True, blank=True)
+	org_name = models.CharField(max_length=500, null=True, blank=True)
+	org_description = models.TextField(null=True, blank=True)
+	org_blog = models.URLField(max_length=500, null=True, blank=True)
+	org_location = models.CharField(max_length=200, null=True, blank=True)
+	public_repos = models.IntegerField(default=0)
+	public_members = models.IntegerField(default=0)
+
+	# Findings summary (stored as JSON text)
+	members_json = models.TextField(null=True, blank=True)    # list of usernames
+	repos_json = models.TextField(null=True, blank=True)      # list of repo names
+	emails_found = models.TextField(null=True, blank=True)    # emails found in commits
+	secrets_found = models.BooleanField(default=False)
+	secrets_json = models.TextField(null=True, blank=True)    # suspected leaked secrets
+
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'HUMINT GitHub Recon'
+
+	def __str__(self):
+		return f'GitHub recon: {self.org_login or self.target_domain}'
+
+
+class HumintJobPosting(models.Model):
+	"""Job postings that reveal internal tech stack / infrastructure."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='humint_job_postings')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+
+	title = models.CharField(max_length=500, null=True, blank=True)
+	company = models.CharField(max_length=300, null=True, blank=True)
+	url = models.CharField(max_length=1000, null=True, blank=True)
+	source = models.CharField(max_length=100, null=True, blank=True)  # linkedin/glassdoor/indeed
+
+	# Extracted tech stack signals
+	technologies = ArrayField(
+		models.CharField(max_length=200), blank=True, default=list)
+	raw_description = models.TextField(null=True, blank=True)
+
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'HUMINT Job Posting'
+
+	def __str__(self):
+		return f'{self.title} @ {self.company} ({self.source})'
+
+
+###############################################################################
+# SIGINT — Signals Intelligence Models
+###############################################################################
+
+class SigintAsnRecord(models.Model):
+	"""ASN/BGP ownership data for the target organization."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='sigint_asn_records')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+
+	asn = models.CharField(max_length=30, null=True, blank=True)        # e.g. AS12345
+	org_name = models.CharField(max_length=300, null=True, blank=True)
+	country = models.CharField(max_length=100, null=True, blank=True)
+	registry = models.CharField(max_length=50, null=True, blank=True)   # arin/ripe/apnic/lacnic/afrinic
+	cidr_ranges = ArrayField(
+		models.CharField(max_length=50), blank=True, default=list)
+	ip_count = models.IntegerField(default=0)
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'SIGINT ASN Record'
+
+	def __str__(self):
+		return f'{self.asn} — {self.org_name}'
+
+
+class SigintEmailSecurity(models.Model):
+	"""Email security posture analysis (SPF, DKIM, DMARC)."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='sigint_email_security')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+	domain_checked = models.CharField(max_length=500, null=True, blank=True)
+
+	# SPF
+	spf_record = models.TextField(null=True, blank=True)
+	spf_valid = models.BooleanField(null=True, blank=True)
+	spf_policy = models.CharField(max_length=20, null=True, blank=True)  # pass/soft/none/fail
+
+	# DMARC
+	dmarc_record = models.TextField(null=True, blank=True)
+	dmarc_valid = models.BooleanField(null=True, blank=True)
+	dmarc_policy = models.CharField(max_length=20, null=True, blank=True)  # none/quarantine/reject
+	dmarc_pct = models.IntegerField(null=True, blank=True)
+
+	# DKIM selectors discovered
+	dkim_selectors = ArrayField(
+		models.CharField(max_length=100), blank=True, default=list)
+	dkim_records = models.TextField(null=True, blank=True)  # JSON of selector→record
+
+	# Mail exchange infrastructure
+	mx_records = models.TextField(null=True, blank=True)   # JSON list
+	mail_provider = models.CharField(max_length=200, null=True, blank=True)  # Google/Microsoft/etc.
+
+	# Risk assessment
+	spoofing_risk = models.CharField(max_length=20, null=True, blank=True)  # high/medium/low
+	risk_reasons = models.TextField(null=True, blank=True)
+
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'SIGINT Email Security'
+
+	def __str__(self):
+		return f'Email security: {self.domain_checked} [SPF:{self.spf_policy} DMARC:{self.dmarc_policy}]'
+
+
+class SigintIntelligenceRecord(models.Model):
+	"""Shodan / Censys passive intelligence on target IPs."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='sigint_intel_records')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+
+	source = models.CharField(max_length=30, null=True, blank=True)  # shodan/censys
+	ip_address = models.CharField(max_length=100, null=True, blank=True)
+	hostname = models.CharField(max_length=500, null=True, blank=True)
+	org = models.CharField(max_length=300, null=True, blank=True)
+	isp = models.CharField(max_length=300, null=True, blank=True)
+	country = models.CharField(max_length=100, null=True, blank=True)
+	city = models.CharField(max_length=100, null=True, blank=True)
+	asn = models.CharField(max_length=30, null=True, blank=True)
+	os = models.CharField(max_length=200, null=True, blank=True)
+	last_update = models.CharField(max_length=50, null=True, blank=True)
+
+	# Exposed services
+	open_ports = ArrayField(
+		models.IntegerField(), blank=True, default=list)
+	services_json = models.TextField(null=True, blank=True)   # JSON: port→service detail
+	vulns_json = models.TextField(null=True, blank=True)      # CVEs from Shodan
+
+	# Threat intel
+	tags = ArrayField(
+		models.CharField(max_length=100), blank=True, default=list)  # honeypot/tor/vpn/cdn
+	is_cloud = models.BooleanField(default=False)
+
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'SIGINT Intelligence Record'
+
+	def __str__(self):
+		return f'{self.source.upper()} {self.ip_address}: {self.org}'
+
+
+class SigintCertificateRecord(models.Model):
+	"""Deep SSL/TLS certificate analysis from CT logs."""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(
+		ScanHistory, on_delete=models.CASCADE, null=True, blank=True,
+		related_name='sigint_cert_records')
+	target_domain = models.ForeignKey(
+		Domain, on_delete=models.CASCADE, null=True, blank=True)
+
+	common_name = models.CharField(max_length=500, null=True, blank=True)
+	issuer = models.CharField(max_length=500, null=True, blank=True)
+	issuer_org = models.CharField(max_length=300, null=True, blank=True)
+	san_domains = ArrayField(
+		models.CharField(max_length=500), blank=True, default=list)
+
+	not_before = models.DateTimeField(null=True, blank=True)
+	not_after = models.DateTimeField(null=True, blank=True)
+	is_expired = models.BooleanField(default=False)
+	days_to_expiry = models.IntegerField(null=True, blank=True)
+
+	cert_fingerprint = models.CharField(max_length=200, null=True, blank=True)
+	serial_number = models.CharField(max_length=200, null=True, blank=True)
+	key_algorithm = models.CharField(max_length=50, null=True, blank=True)  # RSA/EC
+	key_bits = models.IntegerField(null=True, blank=True)
+
+	# Certificate chains / anomalies
+	is_self_signed = models.BooleanField(default=False)
+	is_wildcard = models.BooleanField(default=False)
+	uses_deprecated_algo = models.BooleanField(default=False)  # SHA1/MD5
+
+	source_host = models.CharField(max_length=500, null=True, blank=True)
+	source_port = models.IntegerField(default=443)
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name = 'SIGINT Certificate Record'
+
+	def __str__(self):
+		return f'Cert: {self.common_name} (expires {self.not_after})'

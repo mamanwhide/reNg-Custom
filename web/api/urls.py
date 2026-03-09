@@ -246,6 +246,36 @@ urlpatterns = [
         FetchFreeProxies.as_view(),
         name='fetch_free_proxies'
     ),
+    # HUMINT endpoints
+    path(
+        'queryHumintEmployees/',
+        ListHumintEmployees.as_view(),
+        name='queryHumintEmployees'),
+    path(
+        'queryHumintGithub/',
+        ListHumintGithubRecon.as_view(),
+        name='queryHumintGithub'),
+    path(
+        'queryHumintJobPostings/',
+        ListHumintJobPostings.as_view(),
+        name='queryHumintJobPostings'),
+    # SIGINT endpoints
+    path(
+        'querySigintAsn/',
+        ListSigintAsnRecords.as_view(),
+        name='querySigintAsn'),
+    path(
+        'querySigintEmailSecurity/',
+        ListSigintEmailSecurity.as_view(),
+        name='querySigintEmailSecurity'),
+    path(
+        'querySigintIntelligence/',
+        ListSigintIntelligenceRecords.as_view(),
+        name='querySigintIntelligence'),
+    path(
+        'querySigintCertificates/',
+        ListSigintCertificateRecords.as_view(),
+        name='querySigintCertificates'),
 ]
 
 urlpatterns += router.urls

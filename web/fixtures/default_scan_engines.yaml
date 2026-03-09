@@ -15,7 +15,10 @@
       \   'project_management',\r\n    'code_sharing',\r\n    'config_files',\r\n
       \   'jenkins',\r\n    'wordpress_files',\r\n    'php_error',\r\n    'exposed_documents',\r\n
       \   'db_files',\r\n    'git_exposed'\r\n  ],\r\n  'intensity': 'normal',\r\n
-      \ 'documents_limit': 50\r\n}\r\ndir_file_fuzz: {\r\n  'auto_calibration': true,\r\n
+      \ 'documents_limit': 50,\r\n  'humint': {\r\n    'github_org': true,\r\n    'linkedin':
+      true,\r\n    'job_postings': true\r\n  },\r\n  'sigint': {\r\n    'asn_recon':
+      true,\r\n    'email_security': true,\r\n    'passive_intel': false,\r\n    'cert_analysis':
+      true\r\n  }\r\n}\r\ndir_file_fuzz: {\r\n  'auto_calibration': true,\r\n
       \ 'enable_http_crawl': true,\r\n  'rate_limit': 150,\r\n  'extensions': ['html',
       'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','sql','json','yml','pdf'],\r\n
       \ 'follow_redirect': false,\r\n  'max_time': 0,\r\n  'match_http_status': [200,
@@ -55,7 +58,10 @@
       \   'code_sharing',\r\n    'config_files',\r\n    'jenkins',\r\n    'wordpress_files',\r\n
       \   'php_error',\r\n    'exposed_documents',\r\n    'db_files',\r\n    'git_exposed'\r\n
       \ ],\r\n  'custom_dorks': [\r\n    {'lookup_site': '_target_', 'lookup_extensions':
-      'php'}\r\n  ],\r\n  'intensity': 'normal',\r\n  'documents_limit': 50\r\n}"
+      'php'}\r\n  ],\r\n  'intensity': 'normal',\r\n  'documents_limit': 50,\r\n
+      \  'humint': {\r\n    'github_org': true,\r\n    'linkedin': true,\r\n    'job_postings':
+      true\r\n  },\r\n  'sigint': {\r\n    'asn_recon': true,\r\n    'email_security':
+      true,\r\n    'passive_intel': false,\r\n    'cert_analysis': true\r\n  }\r\n}"
     default_engine: true
 - model: scanEngine.enginetype
   pk: 4

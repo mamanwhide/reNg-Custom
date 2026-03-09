@@ -22,23 +22,23 @@
 ### Diagram Arsitektur
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        USER BROWSER                          │
-│                     (Dashboard Access)                       │
+│                        USER BROWSER                         │
+│                     (Dashboard Access)                      │
 └───────────────────────────┬─────────────────────────────────┘
                             │ HTTPS (Port 443)
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                      NGINX (Reverse Proxy)                   │
-│              SSL Termination + Load Balancing                │
+│                      NGINX (Reverse Proxy)                  │
+│              SSL Termination + Load Balancing               │
 └───────────────────────────┬─────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                   DJANGO WEB APPLICATION                     │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │  Dashboard   │  │     API      │  │   Admin      │      │
-│  │   (Views)    │  │(REST/GraphQL)│  │  (Django)    │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│                   DJANGO WEB APPLICATION                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐       │
+│  │  Dashboard   │  │     API      │  │   Admin      │       │
+│  │   (Views)    │  │(REST/GraphQL)│  │  (Django)    │       │
+│  └──────────────┘  └──────────────┘  └──────────────┘       │
 └───────────────────────────┬─────────────────────────────────┘
                             │
         ┌───────────────────┼───────────────────┐
@@ -75,7 +75,7 @@ Services:
 
 ---
 
-## ⚙️ Komponen Utama
+## Komponen Utama
 
 ### 1. **Django Web Application** (`web/`)
 - **Framework**: Django 3.2+
@@ -167,7 +167,7 @@ Django (Task Creator) → Redis (Task Queue) → Celery Worker (Task Executor)
 
 ---
 
-## 🔄 Alur Kerja Lengkap
+## Alur Kerja Lengkap
 
 ### Phase 1: Inisialisasi Scan
 
@@ -309,11 +309,11 @@ For each subdomain/endpoint:
 # Original Code (BUGGY):
 ip, created = save_ip_address(host, subdomain, ...)
 self.notify(fields={'IPs': f'• `{ip.address}`'})
-# ❌ Crash jika ip = None
+# Crash jika ip = None
 
 # Fixed Code:
 ip, created = save_ip_address(host, subdomain, ...)
-if ip:  # ✅ Null check!
+if ip:  # Null check!
     self.notify(fields={'IPs': f'• `{ip.address}`'})
 ```
 

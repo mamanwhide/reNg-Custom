@@ -3257,3 +3257,110 @@ class FetchFreeProxies(APIView):
 			'message': 'Proxy fetch started. Proxies will be added to your proxy list once complete.',
 			'task_id': task.id,
 		}, status=HTTP_202_ACCEPTED)
+
+###############################################################################
+# HUMINT API Views
+###############################################################################
+
+class ListHumintEmployees(APIView):
+	"""Return enriched employee profiles discovered by HUMINT tasks."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		source = request.query_params.get('source')
+		qs = HumintEmployeeProfile.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		if source:
+			qs = qs.filter(source=source)
+		serializer = HumintEmployeeProfileSerializer(qs, many=True)
+		return Response({'employees': serializer.data})
+
+
+class ListHumintGithubRecon(APIView):
+	"""Return GitHub org recon results."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		qs = HumintGithubRecon.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		serializer = HumintGithubReconSerializer(qs, many=True)
+		return Response({'github_recon': serializer.data})
+
+
+class ListHumintJobPostings(APIView):
+	"""Return job posting intelligence (tech stack extraction)."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		source = request.query_params.get('source')
+		qs = HumintJobPosting.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		if source:
+			qs = qs.filter(source=source)
+		serializer = HumintJobPostingSerializer(qs, many=True)
+		return Response({'job_postings': serializer.data})
+
+
+###############################################################################
+# SIGINT API Views
+###############################################################################
+
+class ListSigintAsnRecords(APIView):
+	"""Return ASN/BGP ownership records for the target."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		qs = SigintAsnRecord.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		serializer = SigintAsnRecordSerializer(qs, many=True)
+		return Response({'asn_records': serializer.data})
+
+
+class ListSigintEmailSecurity(APIView):
+	"""Return email security posture (SPF/DKIM/DMARC) analysis."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		risk = request.query_params.get('risk')
+		qs = SigintEmailSecurity.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		if risk:
+			qs = qs.filter(spoofing_risk=risk)
+		serializer = SigintEmailSecuritySerializer(qs, many=True)
+		return Response({'email_security': serializer.data})
+
+
+class ListSigintIntelligenceRecords(APIView):
+	"""Return Shodan/Censys passive intelligence records."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		source = request.query_params.get('source')
+		qs = SigintIntelligenceRecord.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		if source:
+			qs = qs.filter(source=source)
+		serializer = SigintIntelligenceRecordSerializer(qs, many=True)
+		return Response({'intel_records': serializer.data})
+
+
+class ListSigintCertificateRecords(APIView):
+	"""Return SSL/TLS certificate analysis results."""
+	def get(self, request, format=None):
+		scan_id = request.query_params.get('scan_id')
+		expired_only = request.query_params.get('expired_only')
+		risk_only = request.query_params.get('risk_only')  # self-signed / weak algo / near expiry
+		qs = SigintCertificateRecord.objects.all()
+		if scan_id:
+			qs = qs.filter(scan_history__id=scan_id)
+		if expired_only in ('1', 'true', 'True'):
+			qs = qs.filter(is_expired=True)
+		if risk_only in ('1', 'true', 'True'):
+			qs = qs.filter(
+				Q(is_expired=True) |
+				Q(is_self_signed=True) |
+				Q(uses_deprecated_algo=True) |
+				Q(days_to_expiry__lt=30, days_to_expiry__isnull=False)
+			)
+		serializer = SigintCertificateRecordSerializer(qs, many=True)
+		return Response({'cert_records': serializer.data})
