@@ -3002,6 +3002,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 	# Loop through URLs and run command
 	results = []
+	discovered_urls = []  # collect ffuf-discovered URLs for post-crawl
 	for url in urls:
 		'''
 			Above while fetching urls, we are not ignoring files, because some
@@ -3028,7 +3029,6 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		dirscan.save()
 
 		# Loop through results and populate EndPoint and DirectoryFile in DB
-		results = []
 		for line in stream_command(
 				fcmd,
 				shell=True,
@@ -3063,8 +3063,12 @@ def dir_file_fuzz(self, ctx=None, description=None):
 			endpoint, created = save_endpoint(url, crawl=False, ctx=ctx)
 
 			# Continue to next line if endpoint returned is None
-			if endpoint == None:
+			if endpoint is None:
 				continue
+
+			# Track newly discovered URL for post-crawl
+			if created:
+				discovered_urls.append(endpoint.http_url)
 
 			# Save endpoint data from FFUF output
 			endpoint.http_status = status
@@ -3100,17 +3104,20 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 			# Get subdomain and add dirscan
 			if ctx.get('subdomain_id', 0) > 0:
-				subdomain = Subdomain.objects.get(id=ctx['subdomain_id'])
+				subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
 			else:
 				subdomain_name = get_subdomain_from_url(endpoint.http_url)
-				subdomain = Subdomain.objects.get(name=subdomain_name, scan_history=self.scan)
-			subdomain.directories.add(dirscan)
-			subdomain.save()
+				subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
+			if subdomain:
+				subdomain.directories.add(dirscan)
+				subdomain.save()
+			else:
+				logger.warning(f'dir_file_fuzz: subdomain not found for {endpoint.http_url}, skipping dir link')
 
-	# Crawl discovered URLs
-	if enable_http_crawl:
+	# Crawl newly discovered URLs (those found by ffuf, not the input URLs)
+	if enable_http_crawl and discovered_urls:
 		ctx['track'] = False
-		http_crawl(urls, ctx=ctx)
+		http_crawl(discovered_urls, ctx=ctx)
 
 	return results
 
