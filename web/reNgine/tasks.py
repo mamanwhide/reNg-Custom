@@ -5846,8 +5846,10 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 		gofuzz_command += f' -w {lookup_keywords}'
 
 	if proxy:
-		gofuzz_command += f' -r {proxy}'
-		logger.debug(f'GooFuzz: using proxy {proxy}')
+		# GooFuzz -r flag expects bare IP:PORT, not http://IP:PORT
+		gofuzz_proxy = proxy.split('://', 1)[-1]
+		gofuzz_command += f' -r {gofuzz_proxy}'
+		logger.debug(f'GooFuzz: using proxy {gofuzz_proxy}')
 	else:
 		logger.debug('GooFuzz: no proxy configured — running without proxy (risk of IP block)')
 

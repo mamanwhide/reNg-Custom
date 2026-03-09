@@ -505,17 +505,23 @@ def get_random_proxy():
 	"""Get a random proxy from the list of proxies input by user in the UI.
 
 	Returns:
-		str: Proxy name or '' if no proxy defined in db or use_proxy is False.
+		str: Proxy URL in http://IP:PORT format, or '' if no proxy defined or
+			use_proxy is False. Tools that need bare IP:PORT should strip the
+			scheme with proxy.split('://', 1)[-1].
 	"""
 	if not Proxy.objects.all().exists():
 		return ''
 	proxy = Proxy.objects.first()
 	if not proxy.use_proxy:
 		return ''
-	proxy_name = random.choice(proxy.proxies.splitlines())
+	proxy_name = random.choice(proxy.proxies.splitlines()).strip()
+	# Ensure the proxy URL always has an http:// scheme.
+	# httpx, ffuf, katana, dalfox, subfinder, hakrawler, gospider all require
+	# a full URL like http://IP:PORT.  Tools that need bare IP:PORT (e.g.
+	# GooFuzz -r flag) should do: proxy.split('://', 1)[-1]
+	if proxy_name and '://' not in proxy_name:
+		proxy_name = 'http://' + proxy_name
 	logger.warning('Using proxy: ' + proxy_name)
-	# os.environ['HTTP_PROXY'] = proxy_name
-	# os.environ['HTTPS_PROXY'] = proxy_name
 	return proxy_name
 
 def remove_ansi_escape_sequences(text):
