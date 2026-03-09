@@ -1,8 +1,3 @@
-# reNgine-Custom
-
-Fork privat dari [reNgine v2.2.0](https://github.com/yogeshojha/rengine) dengan perbaikan keamanan, penyempurnaan fungsional, dan tambahan kemampuan OSINT tingkat lanjut (HUMINT dan SIGINT).
-
----
 
 ## Daftar Isi
 
