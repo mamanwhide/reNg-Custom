@@ -2712,22 +2712,23 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 		custom_nuclei_template_paths = [f'{str(elem)}.yaml' for elem in custom_nuclei_templates]
 		template = templates.extend(custom_nuclei_template_paths)
 
-	# Add DAST templates (AI injection, CVE DAST, vulnerability DAST)
+	# Add DAST templates (AI injection, CVE DAST all years, vulnerability DAST)
+	# Use top-level dast/ subdirs — nuclei recurses into them automatically,
+	# so all CVE years (2018, 2020, 2021, 2022, 2024, future) are included.
 	if run_dast:
 		dast_base = '/root/nuclei-templates/dast'
 		dast_dirs = [
 			f'{dast_base}/ai',
-			f'{dast_base}/cves/2018',
-			f'{dast_base}/cves/2020',
-			f'{dast_base}/cves/2021',
-			f'{dast_base}/cves/2022',
+			f'{dast_base}/cves',
 			f'{dast_base}/vulnerabilities',
 		]
 		import os as _os
 		for d in dast_dirs:
 			if _os.path.isdir(d):
 				templates.append(d)
-				logger.info(f'nuclei_scan: added DAST templates dir {d}')
+				# Count templates in this dir for clear logging
+				tpl_count = sum(len(files) for _, _, files in _os.walk(d) if files)
+				logger.info(f'nuclei_scan: added DAST templates dir {d} ({tpl_count} files)')
 			else:
 				logger.warning(f'nuclei_scan: DAST templates dir not found, skipping: {d}')
 
