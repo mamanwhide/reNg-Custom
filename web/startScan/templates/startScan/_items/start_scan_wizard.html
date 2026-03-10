@@ -92,10 +92,85 @@
               </small>
             </div>
           </div>
+            <h4>Proxy Setup</h4>
+            <div class="mb-4">
+              <p class="text-muted">Choose whether scan traffic should be routed through a proxy. Proxies help bypass IP-based rate limits and geo-restrictions, but they route all traffic through a third-party server and may slow down local (LAN) scans significantly.</p>
+
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <div class="card border h-100" id="proxy-card-auto" style="cursor:pointer;" onclick="selectProxyMode('auto')">
+                    <div class="card-body">
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="proxy_mode" id="proxy_auto" value="auto" checked>
+                        <label class="form-check-label fw-semibold" for="proxy_auto">
+                          <i class="mdi mdi-shield-check-outline text-success me-1"></i> Use Proxy (recommended for public targets)
+                        </label>
+                      </div>
+                      <p class="text-muted mt-2 mb-0 small">Scan traffic is routed through a randomly selected proxy from your proxy list. Best for scanning external targets to avoid rate-limiting or IP blocks.</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="card border h-100" id="proxy-card-none" style="cursor:pointer;" onclick="selectProxyMode('none')">
+                    <div class="card-body">
+                      <div class="form-check">
+                        <input class="form-check-input" type="radio" name="proxy_mode" id="proxy_none" value="none">
+                        <label class="form-check-label fw-semibold" for="proxy_none">
+                          <i class="mdi mdi-lan text-primary me-1"></i> No Proxy (direct connection)
+                        </label>
+                      </div>
+                      <p class="text-muted mt-2 mb-0 small">Scan traffic goes directly to the target. Recommended for LAN/intranet targets or when your network connection is already fast and reliable.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="alert border-0 mb-0" id="proxy-warning-auto" role="alert" style="background:rgba(var(--bs-warning-rgb),.12);">
+                <strong><i class="mdi mdi-alert-outline me-1"></i>Using Proxy — Known risks:</strong>
+                <ul class="mb-0 mt-1 small">
+                  <li><strong>LAN / intranet scans will be unusably slow</strong> — all packets leave your machine, go through the proxy server, and return, adding 100–500 ms RTT per request.</li>
+                  <li><strong>Privacy:</strong> proxy operators can observe the URLs and payloads being scanned. Avoid using free public proxies against sensitive internal systems.</li>
+                  <li><strong>Reliability:</strong> free proxy lists contain dead entries; reNgine auto-selects a live one, but some tools may still fail if the proxy drops mid-scan.</li>
+                  <li><strong>Throughput:</strong> bandwidth is limited by the proxy’s uplink. Large scans (screenshots, directory fuzzing) take longer.</li>
+                </ul>
+              </div>
+
+              <div class="alert border-0 mb-0 d-none" id="proxy-warning-none" role="alert" style="background:rgba(var(--bs-info-rgb),.12);">
+                <strong><i class="mdi mdi-information-outline me-1"></i>No Proxy — Things to keep in mind:</strong>
+                <ul class="mb-0 mt-1 small">
+                  <li><strong>Your real IP is exposed</strong> to the target. Public targets may rate-limit or block your IP after repeated scans.</li>
+                  <li><strong>Google Dorking (OSINT)</strong> will be performed from your IP — Google may temporarily block it after a few searches.</li>
+                  <li>Best choice for <strong>LAN / intranet</strong> targets where proxies add unnecessary latency.</li>
+                </ul>
+              </div>
+            </div>
           {% if domain_ids %}
           <input type="hidden" name="domain_ids" value="{{domain_ids}}">
           {% endif %}
         </form>
+
+<script>
+function selectProxyMode(mode) {
+  document.getElementById('proxy_auto').checked = (mode === 'auto');
+  document.getElementById('proxy_none').checked = (mode === 'none');
+  var cardAuto = document.getElementById('proxy-card-auto');
+  var cardNone = document.getElementById('proxy-card-none');
+  var warnAuto = document.getElementById('proxy-warning-auto');
+  var warnNone = document.getElementById('proxy-warning-none');
+  if (mode === 'auto') {
+    cardAuto.classList.add('border-success');
+    cardNone.classList.remove('border-primary');
+    warnAuto.classList.remove('d-none');
+    warnNone.classList.add('d-none');
+  } else {
+    cardNone.classList.add('border-primary');
+    cardAuto.classList.remove('border-success');
+    warnNone.classList.remove('d-none');
+    warnAuto.classList.add('d-none');
+  }
+}
+document.addEventListener('DOMContentLoaded', function() { selectProxyMode('auto'); });
+</script>
       </div>
     </div>
   </div>

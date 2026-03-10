@@ -75,6 +75,7 @@ class RengineTask(Task):
 		self.results_dir = ctx.get('results_dir', RENGINE_RESULTS)
 		self.yaml_configuration = ctx.get('yaml_configuration', {})
 		self.out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
+		self.proxy_mode = ctx.get('proxy_mode', 'auto')
 		self.history_file = f'{self.results_dir}/commands.txt'
 		self.scan = ScanHistory.objects.filter(pk=self.scan_id).first()
 		self.subscan = SubScan.objects.filter(pk=self.subscan_id).first()

@@ -501,7 +501,7 @@ def extract_path_from_url(url):
 #-------#
 
 
-def get_random_proxy():
+def get_random_proxy(proxy_mode='auto'):
 	"""Get a working proxy from the list of proxies configured in the UI.
 
 	Tries up to 100 randomly-selected proxies in concurrent batches of 20
@@ -509,12 +509,19 @@ def get_random_proxy():
 	is reachable.  This prevents tools from silently failing when a randomly
 	chosen proxy happens to be dead (as is common with large free-proxy lists).
 
+	Args:
+		proxy_mode (str): 'auto' (default) — use proxy if available.
+		                  'none' — skip proxy entirely (direct connection).
+		                  Controlled by the per-scan Proxy Setup UI option.
+
 	Returns:
 		str: Proxy URL in http://IP:PORT format, or '' if no proxy defined,
-			use_proxy is False, or no working proxy found.
+			use_proxy is False, proxy_mode=='none', or no working proxy found.
 			Tools that need bare IP:PORT should strip the scheme with
 			proxy.split('://', 1)[-1].
 	"""
+	if proxy_mode == 'none':
+		return ''
 	import socket as _socket
 	import urllib.parse as _up
 	import concurrent.futures as _cf

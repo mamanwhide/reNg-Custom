@@ -117,8 +117,76 @@
                             </div>
                         </div>
                     </div>
+                  <h3>Proxy Setup</h3>
+                  <div class="mb-4">
+                    <p class="text-muted">Choose whether scan traffic should be routed through a proxy. Proxies help bypass IP-based rate limits and geo-restrictions, but may slow down local (LAN) scans significantly.</p>
+
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-6">
+                        <div class="card border h-100" id="sched-proxy-card-auto" style="cursor:pointer;" onclick="selectSchedProxyMode('auto')">
+                          <div class="card-body">
+                            <div class="form-check">
+                              <input class="form-check-input" type="radio" name="proxy_mode" id="sched_proxy_auto" value="auto" checked>
+                              <label class="form-check-label fw-semibold" for="sched_proxy_auto">
+                                <i class="mdi mdi-shield-check-outline text-success me-1"></i> Use Proxy
+                              </label>
+                            </div>
+                            <p class="text-muted mt-2 mb-0 small">Route traffic through a live proxy. Best for external targets to avoid rate-limiting.</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="col-md-6">
+                        <div class="card border h-100" id="sched-proxy-card-none" style="cursor:pointer;" onclick="selectSchedProxyMode('none')">
+                          <div class="card-body">
+                            <div class="form-check">
+                              <input class="form-check-input" type="radio" name="proxy_mode" id="sched_proxy_none" value="none">
+                              <label class="form-check-label fw-semibold" for="sched_proxy_none">
+                                <i class="mdi mdi-lan text-primary me-1"></i> No Proxy (direct)
+                              </label>
+                            </div>
+                            <p class="text-muted mt-2 mb-0 small">Direct connection. Best for LAN/intranet targets.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="alert border-0 mb-0" id="sched-proxy-warning-auto" role="alert" style="background:rgba(var(--bs-warning-rgb),.12);">
+                      <strong><i class="mdi mdi-alert-outline me-1"></i>Using Proxy — risks:</strong>
+                      <ul class="mb-0 mt-1 small">
+                        <li><strong>LAN scans will be very slow</strong> — all packets are routed through the proxy, adding latency per request.</li>
+                        <li><strong>Privacy:</strong> proxy operators can observe scan traffic. Avoid free proxies for sensitive targets.</li>
+                        <li><strong>Reliability:</strong> proxy may drop connections mid-scan.</li>
+                      </ul>
+                    </div>
+                    <div class="alert border-0 mb-0 d-none" id="sched-proxy-warning-none" role="alert" style="background:rgba(var(--bs-info-rgb),.12);">
+                      <strong><i class="mdi mdi-information-outline me-1"></i>No Proxy — keep in mind:</strong>
+                      <ul class="mb-0 mt-1 small">
+                        <li><strong>Your real IP is exposed</strong> to the target. Public targets may rate-limit or block it.</li>
+                        <li>Ideal for <strong>LAN / intranet</strong> targets where proxies add unnecessary latency.</li>
+                      </ul>
+                    </div>
+                  </div>
                 </form>
             </div>
         </div>
     </div>
+
+<script>
+function selectSchedProxyMode(mode) {
+  document.getElementById('sched_proxy_auto').checked = (mode === 'auto');
+  document.getElementById('sched_proxy_none').checked = (mode === 'none');
+  var cardAuto = document.getElementById('sched-proxy-card-auto');
+  var cardNone = document.getElementById('sched-proxy-card-none');
+  var warnAuto = document.getElementById('sched-proxy-warning-auto');
+  var warnNone = document.getElementById('sched-proxy-warning-none');
+  if (mode === 'auto') {
+    cardAuto.classList.add('border-success'); cardNone.classList.remove('border-primary');
+    warnAuto.classList.remove('d-none'); warnNone.classList.add('d-none');
+  } else {
+    cardNone.classList.add('border-primary'); cardAuto.classList.remove('border-success');
+    warnNone.classList.remove('d-none'); warnAuto.classList.add('d-none');
+  }
+}
+document.addEventListener('DOMContentLoaded', function() { selectSchedProxyMode('auto'); });
+</script>
 </div>

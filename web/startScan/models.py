@@ -68,6 +68,12 @@ class ScanHistory(models.Model):
 		null=True,
 		default=list
 	)
+	cfg_proxy_mode = models.CharField(
+		max_length=20,
+		default='auto',
+		choices=[('auto', 'Auto (use proxy if available)'), ('none', 'No proxy (direct connection)')],
+		help_text='Whether to route scan traffic through a proxy.'
+	)
 
 
 	def __str__(self):

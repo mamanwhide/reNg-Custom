@@ -281,6 +281,7 @@ def start_scan_ui(request, slug, domain_id):
         excluded_paths = request.POST['excludedPaths'] # string separated by ,
         # split excluded paths by ,
         excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+        proxy_mode = request.POST.get('proxy_mode', 'auto')
 
         # Get engine type
         engine_id = request.POST['scan_mode']
@@ -304,7 +305,8 @@ def start_scan_ui(request, slug, domain_id):
             'out_of_scope_subdomains': subdomains_out,
             'starting_point_path': starting_point_path,
             'excluded_paths': excluded_paths,
-            'initiated_by_id': request.user.id
+            'initiated_by_id': request.user.id,
+            'proxy_mode': proxy_mode,
         }
         initiate_scan.apply_async(kwargs=kwargs)
         scan.save()
@@ -376,6 +378,7 @@ def start_multiple_scan(request, slug):
             excluded_paths = request.POST['excludedPaths'] # string separated by ,
             # split excluded paths by ,
             excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+            proxy_mode = request.POST.get('proxy_mode', 'auto')
 
             grouped_scans = []
 
@@ -399,6 +402,7 @@ def start_multiple_scan(request, slug):
                     'out_of_scope_subdomains': subdomains_out,
                     'starting_point_path': starting_point_path,
                     'excluded_paths': excluded_paths,
+                    'proxy_mode': proxy_mode,
                 }
 
                 _scan_task = initiate_scan.si(**kwargs)
@@ -619,6 +623,7 @@ def schedule_scan(request, host_id, slug):
         excluded_paths = request.POST['excludedPaths'] # string separated by ,
         # split excluded paths by ,
         excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+        proxy_mode = request.POST.get('proxy_mode', 'auto')
 
         # Get engine type
         engine = get_object_or_404(EngineType, id=engine_type)
@@ -651,7 +656,8 @@ def schedule_scan(request, host_id, slug):
                 'out_of_scope_subdomains': subdomains_out,
                 'starting_point_path': starting_point_path,
                 'excluded_paths': excluded_paths,
-                'initiated_by_id': request.user.id
+                'initiated_by_id': request.user.id,
+                'proxy_mode': proxy_mode,
             }
             PeriodicTask.objects.create(
                 interval=schedule,
@@ -672,7 +678,8 @@ def schedule_scan(request, host_id, slug):
                 'out_of_scope_subdomains': subdomains_out,
                 'starting_point_path': starting_point_path,
                 'excluded_paths': excluded_paths,
-                'initiated_by_id': request.user.id
+                'initiated_by_id': request.user.id,
+                'proxy_mode': proxy_mode,
             }
             PeriodicTask.objects.create(
                 clocked=clock,
@@ -833,6 +840,7 @@ def start_organization_scan(request, id, slug):
         excluded_paths = request.POST['excludedPaths'] # string separated by ,
         # split excluded paths by ,
         excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+        proxy_mode = request.POST.get('proxy_mode', 'auto')
 
         # Start Celery task for each organization's domains
         for domain in organization.get_domains():
@@ -854,6 +862,7 @@ def start_organization_scan(request, id, slug):
                 'out_of_scope_subdomains': subdomains_out,
                 'starting_point_path': starting_point_path,
                 'excluded_paths': excluded_paths,
+                'proxy_mode': proxy_mode,
             }
             initiate_scan.apply_async(kwargs=kwargs)
             scan.save()
@@ -902,6 +911,7 @@ def schedule_organization_scan(request, slug, id):
         excluded_paths = request.POST['excludedPaths'] # string separated by ,
         # split excluded paths by ,
         excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+        proxy_mode = request.POST.get('proxy_mode', 'auto')
 
         for domain in organization.get_domains():
             timestr = str(datetime.strftime(timezone.now(), '%Y_%m_%d_%H_%M_%S'))
@@ -938,6 +948,7 @@ def schedule_organization_scan(request, slug, id):
                     'out_of_scope_subdomains': subdomains_out,
                     'starting_point_path': starting_point_path,
                     'excluded_paths': excluded_paths,
+                    'proxy_mode': proxy_mode,
                 })
                 PeriodicTask.objects.create(
                     interval=schedule,
@@ -962,6 +973,7 @@ def schedule_organization_scan(request, slug, id):
                     'out_of_scope_subdomains': subdomains_out,
                     'starting_point_path': starting_point_path,
                     'excluded_paths': excluded_paths,
+                    'proxy_mode': proxy_mode,
                 })
                 PeriodicTask.objects.create(clocked=clock,
                     one_off=True,

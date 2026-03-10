@@ -69,6 +69,7 @@ def initiate_scan(
 		initiated_by_id=None,
 		starting_point_path='',
 		excluded_paths=None,
+		proxy_mode='auto',
 	):
 	"""Initiate a new scan.
 
@@ -137,6 +138,7 @@ def initiate_scan(
 		scan.cfg_excluded_paths = excluded_paths
 		scan.cfg_out_of_scope_subdomains = out_of_scope_subdomains
 		scan.cfg_imported_subdomains = imported_subdomains
+		scan.cfg_proxy_mode = proxy_mode
 
 		if add_gf_patterns:
 			scan.used_gf_patterns = ','.join(gf_patterns)
@@ -154,7 +156,8 @@ def initiate_scan(
 			'starting_point_path': starting_point_path,
 			'excluded_paths': excluded_paths,
 			'yaml_configuration': config,
-			'out_of_scope_subdomains': out_of_scope_subdomains
+			'out_of_scope_subdomains': out_of_scope_subdomains,
+			'proxy_mode': proxy_mode,
 		}
 		ctx_str = json.dumps(ctx, indent=2)
 
@@ -489,7 +492,7 @@ def subdomain_discovery(
 		cmd = None
 		cmd_env = None
 		logger.info(f'Scanning subdomains for {host} with {tool}')
-		proxy = get_random_proxy()
+		proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 		if tool in default_subdomain_tools:
 			if tool == 'amass-passive':
 				use_amass_config = config.get(USE_AMASS_CONFIG, False)
@@ -2584,7 +2587,7 @@ def port_scan(self, hosts=None, ctx=None, description=None):
 		list: List of open ports (dict).
 	"""
 	input_file = f'{self.results_dir}/input_subdomains_port_scan.txt'
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 
 	# Config
 	config = self.yaml_configuration.get(PORT_SCAN) or {}
@@ -3015,7 +3018,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		url_parse = urlparse(url)
 		url = url_parse.scheme + '://' + url_parse.netloc
 		url += '/FUZZ' # TODO: fuzz not only URL but also POST / PUT / headers
-		proxy = get_random_proxy()
+		proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 
 		# Build final cmd
 		fcmd = cmd
@@ -3135,7 +3138,7 @@ def fetch_url(self, urls=None, ctx=None, description=None):
 		description (str, optional): Task description shown in UI.
 	"""
 	input_path = f'{self.results_dir}/input_endpoints_fetch_url.txt'
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 
 	# Config
 	config = self.yaml_configuration.get(FETCH_URL) or {}
@@ -3769,7 +3772,7 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	should_fetch_gpt_report = config.get(FETCH_GPT_REPORT, DEFAULT_GET_GPT_REPORT)
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
@@ -3933,7 +3936,7 @@ def dalfox_xss_scan(self, urls=None, ctx=None, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
@@ -4074,7 +4077,7 @@ def crlfuzz_scan(self, urls=None, ctx=None, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 	user_agent = vuln_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	threads = vuln_config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	input_path = f'{self.results_dir}/input_endpoints_crlf.txt'
@@ -4301,7 +4304,7 @@ def http_crawl(
 		threads = len(urls)
 
 	# Get random proxy
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 
 	# Run command
 	cmd += f' -cl -ct -rt -location -td -websocket -cname -asn -cdn -probe -random-agent'
@@ -5878,7 +5881,7 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 
 	results = []
 	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t {lookup_target} -d {delay} -p {page_count}'
-	proxy = get_random_proxy()
+	proxy = get_random_proxy(proxy_mode=getattr(scan_history, 'cfg_proxy_mode', 'auto'))
 
 	if lookup_extensions:
 		gofuzz_command += f' -e {lookup_extensions}'
@@ -5949,9 +5952,6 @@ def save_metadata_info(meta_dict):
 	logger.warning(f'Getting metadata for {meta_dict.osint_target}')
 
 	scan_history = ScanHistory.objects.get(id=meta_dict.scan_id)
-
-	# Proxy settings
-	get_random_proxy()
 
 	# Get metadata
 	result = extract_metadata_from_google_search(meta_dict.osint_target, meta_dict.documents_limit)
