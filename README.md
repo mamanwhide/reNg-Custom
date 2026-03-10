@@ -5,6 +5,8 @@
 - [Arsitektur dan Cara Kerja](#arsitektur-dan-cara-kerja)
 - [Daftar Tools](#daftar-tools)
 - [Cara Menggunakan](#cara-menggunakan)
+- [Proxy: Sumber dan Cara Kerja](#proxy-sumber-dan-cara-kerja)
+- [Nuclei: DAST, Custom Templates, dan False Positive](#nuclei-dast-custom-templates-dan-false-positive)
 - [Instalasi](#instalasi)
 - [Riwayat Pembaruan](#riwayat-pembaruan)
 
@@ -162,6 +164,249 @@ Hasil HUMINT dan SIGINT tersedia via REST API:
 
 ---
 
+## Proxy: Sumber dan Cara Kerja
+
+reNgine-Custom menggunakan proxy untuk melindungi IP asli selama scanning (terutama subdomain discovery, nuclei, fetch URL, dan dorking Google). Sistem proxy bersifat otomatis — tidak perlu konfigurasi manual jika menggunakan proxy gratis.
+
+### Sumber Proxy
+
+Proxy diambil secara otomatis dari 4 sumber publik:
+
+| # | Sumber | URL | Metode |
+|---|--------|-----|--------|
+| 1 | **proxifly** | `cdn.jsdelivr.net/gh/proxifly/free-proxy-list@main/.../data.json` | JSON CDN — paling reliable |
+| 2 | **proxyscrape** | `api.proxyscrape.com/v3/free-proxy-list/get?protocol=http...` | Plain-text REST API |
+| 3 | **free-proxy-list.net** | `https://free-proxy-list.net/` | HTML table scraping |
+| 4 | **proxylistfree.com** | `https://www.proxylistfree.com/` | HTML table scraping |
+
+Semua proxy tersimpan di `Settings → Proxy` (field `proxies`) dalam format `IP:PORT` satu entri per baris.
+
+### Alur Kerja Otomatis (Celery Beat)
+
+```
+Worker startup (rengine-celery-1)
+    │
+    ▼
+worker_ready signal (celery.py)
+    │
+    ▼
+Daftarkan PeriodicTask ke DB:
+  name: "Weekly proxy refresh & prune"
+  task: fetch_free_proxies
+  jadwal: setiap 7 hari
+    │
+    ▼
+rengine-celery-beat-1 (DatabaseScheduler)
+  polling DB tiap ~5 detik
+    │
+    ▼  [setiap 7 hari]
+fetch_free_proxies()
+    ├─ Scrape 4 sumber → kumpulkan IP:PORT baru
+    ├─ Test semua proxy EXISTING di DB
+    │   └─ 50 thread, TCP connect timeout 2 detik
+    │       ├─ Hidup  → dipertahankan
+    │       └─ Mati   → dihapus (pruned)
+    ├─ Merge: proxy lama yang masih hidup + proxy baru
+    └─ Simpan ke DB
+```
+
+**Contoh log refresh:**
+```
+fetch_free_proxies: proxifly gave 523 proxies
+fetch_free_proxies: proxyscrape added 312
+fetch_free_proxies: free-proxy-list added 89
+fetch_free_proxies: testing 2039 existing proxies for liveness...
+fetch_free_proxies: pruned 1847 dead proxies, 192 still alive
+fetch_free_proxies: +968 new, -1847 dead removed, 1160 total in DB
+```
+
+### Pemilihan Proxy saat Scan (get_random_proxy)
+
+Setiap kali tool (nuclei, httpx, naabu, dll) membutuhkan proxy, sistem:
+
+1. Mengambil daftar proxy dari DB
+2. Mengacak urutan (`random.shuffle`)
+3. Menguji **batch 20 proxy secara concurrent** (TCP connect, timeout 2 detik)
+4. Mengembalikan **proxy pertama yang berhasil konek**
+5. Jika tidak ada yang hidup setelah 100 kandidat → fallback ke koneksi langsung (tanpa proxy)
+
+```
+get_random_proxy(proxy_mode)
+    │
+    ├─ proxy_mode='none' → return '' (langsung, tidak pakai proxy)
+    │
+    ├─ proxy_mode='auto' (default)
+    │   ├─ Tidak ada proxy di DB → return ''
+    │   ├─ use_proxy=False di Settings → return ''
+    │   └─ Test batch 20, ambil yang pertama hidup
+    │       └─ Tidak ada yang hidup → return '' (fallback)
+    │
+    └─ Return: 'http://IP:PORT'
+```
+
+### Opsi Per-Scan (Proxy Setup UI)
+
+Saat memulai scan, pengguna dapat memilih mode proxy di wizard **"Proxy Setup"**:
+
+| Opsi | Keterangan | Kapan Digunakan |
+|------|-----------|-----------------|
+| **Use Proxy (auto)** | Gunakan proxy jika tersedia, fallback langsung jika tidak ada | Target publik / internet |
+| **No Proxy (direct)** | Selalu koneksi langsung, tidak pernah pakai proxy | Target LAN / intranet lokal |
+
+> **Peringatan mode proxy di jaringan LAN:** Proxy publik gratis menambahkan latensi 100–500ms per request, membuat scanning LAN sangat lambat. Gunakan mode **No Proxy** untuk target intranet.
+
+### Trigger Refresh Manual
+
+```bash
+# Trigger fetch proxy sekarang (tanpa menunggu 7 hari)
+docker exec rengine-celery-1 python -c \
+  "from reNgine.tasks import fetch_free_proxies; r=fetch_free_proxies(); print(r)"
+
+# Cek jadwal di DB
+docker exec rengine-web-1 python manage.py shell -c "
+from django_celery_beat.models import PeriodicTask
+t = PeriodicTask.objects.get(name='Weekly proxy refresh & prune')
+print('Interval:', t.interval, '| Enabled:', t.enabled, '| Last run:', t.last_run_at)
+"
+
+# Verifikasi proxy aktif saat scan berjalan
+docker logs rengine-celery-1 --since=15m 2>&1 | grep -i "Using proxy\|no working proxy"
+```
+
+---
+
+## Nuclei: DAST, Custom Templates, dan False Positive
+
+### Mengaktifkan DAST
+
+DAST (Dynamic Application Security Testing) nuclei menggunakan template khusus dari direktori `/root/nuclei-templates/dast/`. Aktifkan via YAML engine:
+
+```yaml
+vulnerability_scan:
+  run_nuclei: true
+  nuclei:
+    run_dast: true               # aktifkan DAST templates
+    severities: [unknown, info, low, medium, high, critical]
+    exclude_tags: [webauthn, passkey]   # tag yang di-skip (false positive umum)
+```
+
+Saat `run_dast: true`, tiga direktori ditambahkan ke perintah nuclei:
+
+```
+-t /root/nuclei-templates/dast/ai
+-t /root/nuclei-templates/dast/cves
+-t /root/nuclei-templates/dast/vulnerabilities
+```
+
+> nuclei merekursi ke dalam setiap direktori secara otomatis, sehingga semua subdirektori (termasuk CVE per tahun: 2018, 2020, 2021, 2022, 2024) ikut di-scan.
+
+**Contoh command nuclei yang dihasilkan:**
+```
+nuclei -j -irr -l urls_unfurled.txt -c 50 -proxy http://1.2.3.4:8080
+  -retries 1 -rl 150 -timeout 5 -etags webauthn,passkey -silent
+  -t /root/nuclei-templates
+  -t /root/nuclei-templates/dast/ai
+  -t /root/nuclei-templates/dast/cves
+  -t /root/nuclei-templates/dast/vulnerabilities
+  -severity critical
+```
+
+**Verifikasi DAST aktif:**
+```bash
+# Cek log saat scan berjalan
+docker logs rengine-celery-1 --since=15m 2>&1 | grep -i "dast"
+# Output yang diharapkan:
+# nuclei_scan: added DAST templates dir /root/nuclei-templates/dast/ai (N files)
+# nuclei_scan: added DAST templates dir /root/nuclei-templates/dast/cves (N files)
+# nuclei_scan: added DAST templates dir /root/nuclei-templates/dast/vulnerabilities (N files)
+
+# Verifikasi command nuclei aktual pasca scan
+docker exec rengine-web-1 grep -a "^nuclei " \
+  /usr/src/scan_results/*/commands.txt 2>/dev/null | grep dast | head -3
+```
+
+### Update Template Nuclei
+
+```bash
+# Update template nuclei (di dalam container)
+docker exec rengine-celery-1 nuclei -update-templates
+
+# Verifikasi direktori DAST ada
+docker exec rengine-celery-1 ls /root/nuclei-templates/dast/
+# Output yang diharapkan: ai  cves  vulnerabilities
+
+# Hitung total template DAST
+docker exec rengine-celery-1 find /root/nuclei-templates/dast/ -name "*.yaml" | wc -l
+```
+
+### Menghapus False Positive
+
+Ada dua cara untuk mengurangi false positive di nuclei.
+
+#### 1. Via `exclude_tags` di YAML Engine (direkomendasikan)
+
+Tags yang dikeluarkan dari scanning:
+
+```yaml
+vulnerability_scan:
+  nuclei:
+    exclude_tags: [webauthn, passkey, dos, fuzz, intrusive]
+```
+
+Tags yang umum menghasilkan false positive berlebihan:
+
+| Tag | Alasan |
+|-----|--------|
+| `webauthn` | Template autentikasi modern, sering false positive |
+| `passkey` | Idem |
+| `dos` | Denial of Service — berbahaya, jarang akurat |
+| `fuzz` | Fuzzing agresif, noise tinggi |
+| `intrusive` | Template yang mengubah state server |
+
+#### 2. Via `exclude_templates` di YAML Engine
+
+Untuk mengecualikan template tertentu berdasarkan path atau ID:
+
+```yaml
+vulnerability_scan:
+  nuclei:
+    exclude_templates:
+      - /root/nuclei-templates/miscellaneous/old-copyright.yaml
+      - /root/nuclei-templates/technologies/tech-detect.yaml
+```
+
+#### 3. Hapus Vulnerability Manual dari UI
+
+Di halaman **Scan Findings → Vulnerabilities**, klik tombol hapus pada temuan yang merupakan false positive. Temuan hanya dihapus dari DB scan tersebut dan tidak memengaruhi scan berikutnya.
+
+#### 4. Lihat Vulnerability yang Sudah Tersimpan
+
+```bash
+# Lihat dari database langsung
+docker exec rengine-db-1 psql -U rengine rengine -c \
+  "SELECT name, severity, http_url FROM startScan_vulnerability \
+   ORDER BY id DESC LIMIT 20;"
+```
+
+### Custom Nuclei Templates
+
+Untuk menggunakan template nuclei sendiri:
+
+1. Salin template ke dalam container:
+   ```bash
+   docker cp my-template.yaml rengine-celery-1:/root/nuclei-templates/custom/
+   ```
+
+2. Referensikan di YAML engine:
+   ```yaml
+   vulnerability_scan:
+     nuclei:
+       custom_templates:
+         - custom/my-template   # tanpa .yaml
+   ```
+
+---
+
 ## Instalasi
 
 ### Prasyarat
@@ -223,6 +468,8 @@ Semua perubahan dilacak melalui git. Tabel di bawah mencatat riwayat commit seja
 
 | Commit | Tanggal | Perubahan |
 |--------|---------|-----------|
+| `516186c` | 2026-03-11 | feat: weekly proxy refresh + prune dead entries (Celery Beat, setiap 7 hari) |
+| `dc190d7` | 2026-03-11 | fix: get_random_proxy batch-test 20 proxy concurrent — kembalikan yang pertama hidup |
 | `f1a1e94` | 2026-03-09 | feat(osint): tambah HUMINT dan SIGINT, 7 model baru, migrasi 0005, 7 API endpoint baru |
 | `e455064` | 2026-03-09 | fix: perbaiki cakupan DAST CVE, tambah 2024, gunakan dir induk dast/cves/ |
 | `c9fe1c6` | 2026-03-09 | fix: hapus duplikat httpx; tambah 249 template DAST nuclei; proxy auto-fetch untuk GooFuzz |
