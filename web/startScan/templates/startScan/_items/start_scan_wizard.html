@@ -103,7 +103,7 @@
                       <div class="form-check">
                         <input class="form-check-input" type="radio" name="proxy_mode" id="proxy_auto" value="auto" checked>
                         <label class="form-check-label fw-semibold" for="proxy_auto">
-                          <i class="mdi mdi-shield-check-outline text-success me-1"></i> Use Proxy (recommended for public targets)
+                           Use Proxy (recommended for public targets)
                         </label>
                       </div>
                       <p class="text-muted mt-2 mb-0 small">Scan traffic is routed through a randomly selected proxy from your proxy list. Best for scanning external targets to avoid rate-limiting or IP blocks.</p>
@@ -116,7 +116,7 @@
                       <div class="form-check">
                         <input class="form-check-input" type="radio" name="proxy_mode" id="proxy_none" value="none">
                         <label class="form-check-label fw-semibold" for="proxy_none">
-                          <i class="mdi mdi-lan text-primary me-1"></i> No Proxy (direct connection)
+                           No Proxy (direct connection)
                         </label>
                       </div>
                       <p class="text-muted mt-2 mb-0 small">Scan traffic goes directly to the target. Recommended for LAN/intranet targets or when your network connection is already fast and reliable.</p>
@@ -126,7 +126,7 @@
               </div>
 
               <div class="alert border-0 mb-0" id="proxy-warning-auto" role="alert" style="background:rgba(var(--bs-warning-rgb),.12);">
-                <strong><i class="mdi mdi-alert-outline me-1"></i>Using Proxy — Known risks:</strong>
+                <strong>Using Proxy — Known risks:</strong>
                 <ul class="mb-0 mt-1 small">
                   <li><strong>LAN / intranet scans will be unusably slow</strong> — all packets leave your machine, go through the proxy server, and return, adding 100–500 ms RTT per request.</li>
                   <li><strong>Privacy:</strong> proxy operators can observe the URLs and payloads being scanned. Avoid using free public proxies against sensitive internal systems.</li>
@@ -136,7 +136,7 @@
               </div>
 
               <div class="alert border-0 mb-0 d-none" id="proxy-warning-none" role="alert" style="background:rgba(var(--bs-info-rgb),.12);">
-                <strong><i class="mdi mdi-information-outline me-1"></i>No Proxy — Things to keep in mind:</strong>
+                <strong>No Proxy — Things to keep in mind:</strong>
                 <ul class="mb-0 mt-1 small">
                   <li><strong>Your real IP is exposed</strong> to the target. Public targets may rate-limit or block your IP after repeated scans.</li>
                   <li><strong>Google Dorking (OSINT)</strong> will be performed from your IP — Google may temporarily block it after a few searches.</li>
