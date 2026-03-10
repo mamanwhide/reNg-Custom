@@ -4476,8 +4476,18 @@ def http_crawl(
 
 @app.task(name='fetch_free_proxies', bind=False, queue='main_scan_queue')
 def fetch_free_proxies(country_filter=None):
-	"""Fetch free HTTP/HTTPS proxies from multiple public sources and append
-	them to the reNgine Proxy settings object.
+	"""Fetch fresh proxies from multiple public sources, prune dead entries from
+	the existing DB list, then save only live proxies.
+
+	This task is scheduled to run automatically every week (Monday 03:00 UTC)
+	via Celery Beat DatabaseScheduler. It can also be triggered manually.
+
+	Behaviour:
+	  1. Scrape fresh proxies from 4 public sources.
+	  2. Concurrently test every existing proxy — remove dead ones.
+	  3. Merge surviving + new proxies, save to DB.
+	  4. If no source yields proxies AND nothing alive in DB, the DB is left
+	     unchanged so tools can still fall back to 'no proxy' mode.
 
 	Sources:
 	  1. proxifly   — JSON CDN (reliable, no scraping)
@@ -4490,7 +4500,7 @@ def fetch_free_proxies(country_filter=None):
 		    (e.g. 'ID' for Indonesia). None = all countries.
 
 	Returns:
-		dict: {'added': int, 'total': int} counts of newly added vs total proxies.
+		dict: {'added': int, 'pruned': int, 'total': int}
 	"""
 	import re as _re
 	import requests as _requests
@@ -4607,27 +4617,55 @@ def fetch_free_proxies(country_filter=None):
 		logger.warning(f'fetch_free_proxies: proxylistfree.com failed: {e}')
 
 	# ── Merge into DB ────────────────────────────────────────────────────────
-	if not collected:
-		logger.warning('fetch_free_proxies: no proxies collected from any source')
-		return {'added': 0, 'total': 0}
+	# ── Prune dead proxies from existing DB list ────────────────────────────
+	import socket as _socket
+	import concurrent.futures as _cf
 
 	from scanEngine.models import Proxy as ProxyModel
 	proxy_obj, _ = ProxyModel.objects.get_or_create(pk=1)
-	existing_lines = set(
+	existing_lines = [
 		line.strip()
 		for line in (proxy_obj.proxies or '').splitlines()
 		if line.strip()
-	)
-	new_proxies = collected - existing_lines
-	all_proxies = existing_lines | collected
+	]
+
+	def _tcp_ok(entry):
+		"""Return entry if reachable via TCP within 2 seconds, else None."""
+		try:
+			parts = entry.rsplit(':', 1)
+			s = _socket.create_connection((parts[0], int(parts[1])), timeout=2)
+			s.close()
+			return entry
+		except Exception:
+			return None
+
+	alive_existing = set()
+	if existing_lines:
+		logger.info(f'fetch_free_proxies: testing {len(existing_lines)} existing proxies for liveness...')
+		with _cf.ThreadPoolExecutor(max_workers=50) as pool:
+			for result in pool.map(_tcp_ok, existing_lines):
+				if result:
+					alive_existing.add(result)
+		pruned = len(existing_lines) - len(alive_existing)
+		logger.info(f'fetch_free_proxies: pruned {pruned} dead proxies, {len(alive_existing)} still alive')
+	else:
+		pruned = 0
+
+	if not collected and not alive_existing:
+		logger.warning('fetch_free_proxies: no proxies available (sources failed, nothing alive in DB) — keeping DB unchanged')
+		return {'added': 0, 'pruned': 0, 'total': len(existing_lines)}
+
+	# ── Merge alive existing + new collected ─────────────────────────────────
+	new_entries = collected - alive_existing
+	all_proxies = alive_existing | collected
 	proxy_obj.proxies = '\n'.join(sorted(all_proxies))
 	proxy_obj.save()
 
 	logger.info(
-		f'fetch_free_proxies: added {len(new_proxies)} new proxies '
-		f'({len(all_proxies)} total in DB)'
+		f'fetch_free_proxies: +{len(new_entries)} new, -{pruned} dead removed, '
+		f'{len(all_proxies)} total in DB'
 	)
-	return {'added': len(new_proxies), 'total': len(all_proxies)}
+	return {'added': len(new_entries), 'pruned': pruned, 'total': len(all_proxies)}
 
 
 @app.task(name='send_notif', bind=False, queue='send_notif_queue')
