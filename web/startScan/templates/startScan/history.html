@@ -185,6 +185,12 @@ Quick Scan History
                           </a>
                           {% endif %}
 
+                          {% if scan_history.scan_status == 3 or scan_history.scan_status == 0 %}
+                          <a href="#" class="dropdown-item text-success" onclick="continue_scan({{ scan_history.id }})">
+                            <i class="fe-play"></i>&nbsp;Continue Scan
+                          </a>
+                          {% endif %}
+
                           {% if scan_history.scan_status == 1 or scan_history.scan_status == -1%}
                           <a href="#" class="dropdown-item text-danger" onclick="stop_scan(scan_id={{ scan_history.id }}, subscan_id=null, reload_scan_bar=false, reload_location=true)">
                           <i class="fe-alert-triangle"></i>&nbsp;Stop Scan</a>
@@ -717,6 +723,49 @@ function preview_report(id, domain_name){
         })
       }
     }]);
+  }
+
+  function continue_scan(scan_id) {
+    Swal.fire({
+      title: 'Continue Scan?',
+      html: 'A new scan will start with all previously discovered subdomains pre-imported, skipping subdomain enumeration and resuming from where the scan left off.',
+      icon: 'info',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, Continue',
+      cancelButtonText: 'Cancel',
+    }).then((result) => {
+      if (result.isConfirmed) {
+        Swal.fire({ title: 'Starting...', allowOutsideClick: false });
+        swal.showLoading();
+        fetch('/api/action/continue/scan/', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ scan_id: scan_id }),
+        })
+        .then(r => r.json())
+        .then(function(data) {
+          swal.close();
+          if (data.status) {
+            Snackbar.show({
+              text: data.message,
+              pos: 'top-right',
+              duration: 4000,
+            });
+            setTimeout(function() { location.reload(); }, 1000);
+          } else {
+            Swal.fire({ title: 'Error!', text: data.message, icon: 'error' });
+          }
+        })
+        .catch(function(e) {
+          swal.close();
+          Swal.fire({ title: 'Error!', text: String(e), icon: 'error' });
+        });
+      }
+    });
   }
 </script>
 {% endblock page_level_script %}

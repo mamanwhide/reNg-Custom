@@ -533,12 +533,17 @@ def stop_scan(request, id):
     if request.method == "POST":
         scan = get_object_or_404(ScanHistory, id=id)
         try:
+            # 1. Mark scan as aborted FIRST so report() won't overwrite status
+            scan.scan_status = ABORTED_TASK
+            scan.stop_scan_date = timezone.now()
+            scan.save()
+
+            # 2. Revoke all tracked task IDs (top-level chain + all child tasks
+            #    registered via celery_custom_task.create_scan_activity)
             for task_id in scan.celery_ids:
                 app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-            
-            # after celery task is stopped, update the scan status
-            scan.scan_status = ABORTED_TASK
-            scan.save()
+
+            # 3. Also revoke & mark all RUNNING ScanActivity tasks
             tasks = (
                 ScanActivity.objects
                 .filter(scan_of=scan)
@@ -577,6 +582,10 @@ def stop_scans(request, slug):
                 continue
             scan = get_object_or_404(ScanHistory, id=value)
             try:
+                scan.scan_status = ABORTED_TASK
+                scan.stop_scan_date = timezone.now()
+                scan.save()
+
                 for task_id in scan.celery_ids:
                     app.control.revoke(task_id, terminate=True, signal='SIGKILL')
                 tasks = (

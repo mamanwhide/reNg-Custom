@@ -208,6 +208,10 @@ urlpatterns = [
         StopScan.as_view(),
         name='stop_scan'),
     path(
+        'action/continue/scan/',
+        ContinueScan.as_view(),
+        name='continue_scan'),
+    path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
         name='fetch_subscan_results'),
@@ -232,6 +236,11 @@ urlpatterns = [
         'scan_status/',
         ScanStatus.as_view(),
         name='scan_status'),
+    # Lightweight live-status poll for a single scan (used by detail page auto-refresh)
+    path(
+        'scan/live/',
+        GetScanLiveStatus.as_view(),
+        name='scan_live_status'),
     path(
         'action/create/project',
         CreateProjectApi.as_view(),

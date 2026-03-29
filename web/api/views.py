@@ -25,7 +25,7 @@ from recon_note.models import *
 from reNgine.celery import app
 from reNgine.common_func import *
 from reNgine.database_utils import *
-from reNgine.definitions import ABORTED_TASK
+from reNgine.definitions import ABORTED_TASK, INITIATED_TASK, LIVE_SCAN
 from reNgine.tasks import *
 from reNgine.llm import *
 from reNgine.utilities import is_safe_path
@@ -1134,6 +1134,7 @@ class StopScan(APIView):
 					.order_by('-pk')
 				)
 				for task in tasks:
+					app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
 					task.status = ABORTED_TASK
 					task.time = timezone.now()
 					task.save()
@@ -1198,6 +1199,82 @@ class StopScan(APIView):
 				response = {'status': False, 'message': str(e)}
 
 		return Response(response)
+
+
+class ContinueScan(APIView):
+	"""Continue a previously aborted/failed scan in-place.
+
+	Resets the existing ScanHistory status back to pending and re-queues the
+	same scan task, pre-importing all subdomains already discovered so that
+	subdomain enumeration is effectively skipped.
+	No new ScanHistory row is created.
+	"""
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		req = self.request
+		scan_id = req.data.get('scan_id')
+		if not scan_id:
+			return Response({'status': False, 'message': 'scan_id required'}, status=400)
+
+		try:
+			scan = ScanHistory.objects.get(id=scan_id)
+		except ScanHistory.DoesNotExist:
+			return Response({'status': False, 'message': 'Scan not found'}, status=404)
+
+		if scan.scan_status not in (ABORTED_TASK, 0):  # aborted or failed only
+			return Response({
+				'status': False,
+				'message': 'Only aborted or failed scans can be continued'
+			}, status=400)
+
+		try:
+			# Gather all previously discovered subdomains (except the root domain entry)
+			discovered = list(
+				Subdomain.objects
+				.filter(scan_history=scan)
+				.exclude(name=scan.domain.name)
+				.values_list('name', flat=True)
+				.distinct()
+			)
+			# Merge with originally imported subdomains so nothing is lost
+			imported = list(dict.fromkeys(
+				(scan.cfg_imported_subdomains or []) + discovered
+			))
+
+			# Reset scan row in-place so the same history entry is reused
+			scan.scan_status = INITIATED_TASK
+			scan.celery_ids = []
+			scan.stop_scan_date = None
+			scan.aborted_by = None
+			scan.error_message = None
+			scan.save()
+
+			kwargs = {
+				'scan_history_id': scan.id,
+				'domain_id': scan.domain.id,
+				'engine_id': scan.scan_type.id,
+				'scan_type': LIVE_SCAN,
+				'results_dir': '/usr/src/scan_results',
+				'imported_subdomains': imported,
+				'out_of_scope_subdomains': scan.cfg_out_of_scope_subdomains or [],
+				'starting_point_path': scan.cfg_starting_point_path or '',
+				'excluded_paths': scan.cfg_excluded_paths or [],
+				'initiated_by_id': request.user.id,
+				'proxy_mode': scan.cfg_proxy_mode or 'auto',
+			}
+			initiate_scan.apply_async(kwargs=kwargs)
+
+			return Response({
+				'status': True,
+				'scan_id': scan.id,
+				'imported_subdomain_count': len(imported),
+				'message': f'Continuing scan with {len(imported)} previously discovered subdomains imported.',
+			})
+		except Exception as e:
+			logger.error(f'ContinueScan error: {e}')
+			return Response({'status': False, 'message': str(e)}, status=500)
 
 
 class InitiateSubTask(APIView):
@@ -1542,6 +1619,24 @@ class ScanStatus(APIView):
 			}
 		}
 		return Response(response)
+
+
+class GetScanLiveStatus(APIView):
+	"""Lightweight endpoint for polling live scan progress from the detail page."""
+	def get(self, request):
+		scan_id = request.query_params.get('scan_id')
+		if not scan_id:
+			return Response({'status': False, 'message': 'scan_id required'}, status=400)
+		try:
+			scan = ScanHistory.objects.get(id=scan_id)
+		except ScanHistory.DoesNotExist:
+			return Response({'status': False, 'message': 'Scan not found'}, status=404)
+		return Response({
+			'scan_status': scan.scan_status,
+			'subdomain_count': scan.get_subdomain_count(),
+			'endpoint_count': scan.get_endpoint_count(),
+			'vulnerability_count': scan.get_vulnerability_count(),
+		})
 
 
 class Whois(APIView):

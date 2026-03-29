@@ -542,9 +542,15 @@ def get_random_proxy(proxy_mode='auto'):
 		p_url = ('http://' + name) if '://' not in name else name
 		parsed = _up.urlparse(p_url)
 		try:
-			s = _socket.create_connection((parsed.hostname, parsed.port or 80), timeout=2)
+			s = _socket.create_connection((parsed.hostname, parsed.port or 80), timeout=3)
+			# Verify the proxy supports HTTP CONNECT tunneling, not just TCP.
+			# Tools like httpx, nuclei, dalfox use CONNECT for HTTPS targets.
+			# A proxy that accepts TCP but rejects CONNECT will silently drop
+			# all HTTPS requests, causing empty results without any error.
+			s.sendall(b'CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n')
+			resp = s.recv(256).decode('utf-8', errors='ignore')
 			s.close()
-			return p_url
+			return p_url if '200' in resp else None
 		except (OSError, _socket.timeout):
 			return None
 
@@ -562,6 +568,65 @@ def get_random_proxy(proxy_mode='auto'):
 
 	logger.warning('get_random_proxy: no working proxy found among first 100 candidates, running without proxy')
 	return ''
+
+
+def get_all_working_proxies(proxy_mode='auto'):
+	"""Return ALL working proxies from the configured proxy list.
+
+	Used by tools that accept a proxy-list file for per-request IP rotation
+	(e.g. nuclei -proxy-list). Each HTTP request made by such tools will use
+	a different proxy, giving true per-request anonymization.
+
+	Uses the same HTTP CONNECT health-check as get_random_proxy(), so only
+	proxies that genuinely support HTTPS tunneling are returned.
+
+	Returns:
+		list[str]: Proxy URLs in http://IP:PORT format, or [] if proxy is
+			       disabled / not configured / no working proxies found.
+	"""
+	if proxy_mode == 'none':
+		return []
+	import socket as _socket
+	import urllib.parse as _up
+	import concurrent.futures as _cf
+
+	if not Proxy.objects.all().exists():
+		return []
+	proxy_obj = Proxy.objects.first()
+	if not proxy_obj.use_proxy:
+		return []
+
+	proxy_lines = [l.strip() for l in proxy_obj.proxies.splitlines() if l.strip()]
+	if not proxy_lines:
+		return []
+
+	random.shuffle(proxy_lines)
+
+	def _check(name):
+		p_url = ('http://' + name) if '://' not in name else name
+		parsed = _up.urlparse(p_url)
+		try:
+			s = _socket.create_connection((parsed.hostname, parsed.port or 80), timeout=3)
+			s.sendall(b'CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n')
+			resp = s.recv(256).decode('utf-8', errors='ignore')
+			s.close()
+			return p_url if '200' in resp else None
+		except (OSError, _socket.timeout):
+			return None
+
+	working = []
+	for i in range(0, min(len(proxy_lines), 100), 20):
+		batch = proxy_lines[i:i + 20]
+		with _cf.ThreadPoolExecutor(max_workers=len(batch)) as pool:
+			results = list(pool.map(_check, batch))
+		working.extend(r for r in results if r)
+
+	if working:
+		logger.info(f'get_all_working_proxies: {len(working)} working proxies found')
+	else:
+		logger.warning('get_all_working_proxies: no working proxies — will run without proxy')
+	return working
+
 
 def remove_ansi_escape_sequences(text):
 	# Regular expression to match ANSI escape sequences

@@ -16,6 +16,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from api.serializers import SubdomainSerializer
 from celery import chain, chord, group
+from celery.exceptions import ChordError
 from celery.result import allow_join_result
 from celery.utils.log import get_task_logger
 from django.db.models import Count
@@ -144,8 +145,9 @@ def initiate_scan(
 			scan.used_gf_patterns = ','.join(gf_patterns)
 		scan.save()
 
-		# Create scan results dir
-		os.makedirs(scan.results_dir)
+		# Create scan results dir (exist_ok=True so continuing an aborted scan
+		# that already has a results dir does not raise FileExistsError)
+		os.makedirs(scan.results_dir, exist_ok=True)
 
 		# Build task context
 		ctx = {
@@ -414,6 +416,13 @@ def report(ctx=None, description=None):
 		subscan.status = status
 		subscan.save()
 	if scan:
+		# If scan was already aborted by user, do NOT overwrite status or re-notify.
+		# This prevents the ChordError-triggered report() from resetting an
+		# ABORTED scan back to SUCCESS/FAILED and sending duplicate notifications.
+		scan.refresh_from_db()
+		if scan.scan_status == ABORTED_TASK:
+			logger.info('report(): scan already aborted — skipping status update and notification')
+			return
 		if not subscan:
 			scan.scan_status = status
 		# Set stop_scan_date BEFORE send_scan_notif so duration calc in
@@ -789,6 +798,8 @@ def osint(self, host=None, ctx=None, description=None):
 	try:
 		with allow_join_result():
 			job.get(timeout=3600, interval=5)
+	except ChordError as e:
+		logger.warning(f'OSINT Tasks: chord aborted (scan likely stopped): {e}')
 	except Exception as e:
 		logger.error(f'OSINT Tasks error or timeout: {e}')
 
@@ -882,6 +893,8 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 		try:
 			with allow_join_result():
 				job.get(timeout=3600, interval=5)
+		except ChordError as e:
+			logger.warning(f'OSINT discovery: chord aborted (scan likely stopped): {e}')
 		except Exception as e:
 			logger.error(f'OSINT discovery tasks error or timeout: {e}')
 
@@ -1104,53 +1117,66 @@ def humint_linkedin_recon(config, host, scan_history_id, results_dir, ctx=None):
 	tld = _tld_extract(host)
 	company = tld.domain.replace('-', ' ').replace('_', ' ')
 
-	headers = {
-		'User-Agent': (
-			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-			'AppleWebKit/537.36 (KHTML, like Gecko) '
-			'Chrome/120.0.0.0 Safari/537.36'
-		),
-		'Accept-Language': 'en-US,en;q=0.9',
-	}
+	# Use proxy to avoid Bing blocking Docker server IP
+	proxy_url = get_random_proxy(proxy_mode=ctx.get('proxy_mode', 'auto'))
+	proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
+
+	# Rotate User-Agents to reduce fingerprinting
+	_user_agents = [
+		'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+		'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0',
+	]
 
 	found_profiles = []
-	# Use Bing (more tolerant than Google for dorking)
+	# Use multiple search engines — Bing + DuckDuckGo HTML
 	queries = [
 		f'site:linkedin.com/in/ "{company}"',
 		f'site:linkedin.com/in/ "{host}" employee',
 	]
+	search_engines = [
+		('bing', 'https://www.bing.com/search?q={query}&count=50'),
+		('ddg', 'https://html.duckduckgo.com/html/?q={query}'),
+	]
 
 	for query in queries:
-		try:
-			url = f'https://www.bing.com/search?q={_requests.utils.quote(query)}&count=50'
-			r = _requests.get(url, headers=headers, timeout=20)
-			if not r.ok:
-				continue
-			soup = BeautifulSoup(r.text, 'lxml')
-			for result in soup.find_all('li', class_='b_algo'):
-				link_tag = result.find('a')
-				if not link_tag:
+		for engine_name, url_template in search_engines:
+			try:
+				headers = {
+					'User-Agent': random.choice(_user_agents),
+					'Accept-Language': 'en-US,en;q=0.9',
+				}
+				url = url_template.format(query=_requests.utils.quote(query))
+				r = _requests.get(url, headers=headers, proxies=proxies, timeout=25, verify=False)
+				if not r.ok:
+					logger.debug(f'HUMINT LinkedIn: {engine_name} returned {r.status_code}')
 					continue
-				link = link_tag.get('href', '')
-				if 'linkedin.com/in/' not in link:
-					continue
-				title_text = link_tag.get_text(strip=True)
-				# Extract name and designation from snippet
-				snippet = result.find('p')
-				snippet_text = snippet.get_text(strip=True) if snippet else ''
-				# Heuristic: "Name - Title at Company | LinkedIn"
-				parts = title_text.split(' - ')
-				name = parts[0].strip() if parts else title_text
-				designation = parts[1].split('|')[0].strip() if len(parts) > 1 else ''
-				if name and name not in [p['name'] for p in found_profiles]:
-					found_profiles.append({
-						'name': name[:500],
-						'designation': designation[:500],
-						'linkedin_url': link[:500],
-						'source': 'linkedin_google_dork',
-					})
-		except Exception as e:
-			logger.debug(f'HUMINT LinkedIn: search error: {e}')
+				soup = BeautifulSoup(r.text, 'lxml')
+				# Bing: li.b_algo > a, DDG: a.result__a
+				link_tags = soup.find_all('a', href=True)
+				for link_tag in link_tags:
+					link = link_tag.get('href', '')
+					if 'linkedin.com/in/' not in link:
+						continue
+					title_text = link_tag.get_text(strip=True)
+					# Heuristic: "Name - Title at Company | LinkedIn"
+					parts = title_text.split(' - ')
+					name = parts[0].strip() if parts else title_text
+					designation = parts[1].split('|')[0].strip() if len(parts) > 1 else ''
+					if name and name not in [p['name'] for p in found_profiles]:
+						found_profiles.append({
+							'name': name[:500],
+							'designation': designation[:500],
+							'linkedin_url': link[:500],
+							'source': f'linkedin_{engine_name}_dork',
+						})
+				if found_profiles:
+					break  # got results from this engine, skip remaining engines for this query
+			except Exception as e:
+				logger.debug(f'HUMINT LinkedIn: {engine_name} search error: {e}')
+		# Small delay between queries
+		if queries.index(query) < len(queries) - 1:
+			time.sleep(random.randint(3, 6))
 
 	logger.info(f'HUMINT LinkedIn: found {len(found_profiles)} profiles for {host}')
 
@@ -1216,13 +1242,15 @@ def humint_job_postings(config, host, scan_history_id, results_dir, ctx=None):
 		r'\b(Nginx|Apache|IIS|Tomcat|Jetty|HAProxy|Traefik|Caddy)\b',
 	]
 
-	headers = {
-		'User-Agent': (
-			'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-			'AppleWebKit/537.36 (KHTML, like Gecko) '
-			'Chrome/120.0.0.0 Safari/537.36'
-		)
-	}
+	# Use proxy to avoid Bing/DDG blocking Docker server IP
+	proxy_url = get_random_proxy(proxy_mode=ctx.get('proxy_mode', 'auto'))
+	proxies = {'http': proxy_url, 'https': proxy_url} if proxy_url else None
+
+	_user_agents = [
+		'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+		'Mozilla/5.0 (X11; Linux x86_64; rv:124.0) Gecko/20100101 Firefox/124.0',
+	]
 
 	sources = [
 		('indeed', f'site:indeed.com "{company}" jobs'),
@@ -1231,52 +1259,73 @@ def humint_job_postings(config, host, scan_history_id, results_dir, ctx=None):
 		('jobsdb', f'site:jobsdb.com "{company}"'),
 	]
 
+	# Each source query is tried on Bing first, then DDG as fallback
+	_search_engines = [
+		('bing', 'https://www.bing.com/search?q={query}&count=20'),
+		('ddg', 'https://html.duckduckgo.com/html/?q={query}'),
+	]
+
 	all_techs = set()
 	total_jobs = 0
 
 	for source_name, query in sources:
-		try:
-			url = f'https://www.bing.com/search?q={_requests.utils.quote(query)}&count=20'
-			r = _requests.get(url, headers=headers, timeout=20)
-			if not r.ok:
-				continue
-			soup = BeautifulSoup(r.text, 'lxml')
-			for item in soup.find_all('li', class_='b_algo'):
-				link_tag = item.find('a')
-				title_el = item.find('h2')
-				snippet_el = item.find('p')
-				if not link_tag:
+		source_found = False
+		for eng_name, eng_template in _search_engines:
+			if source_found:
+				break
+			try:
+				headers = {
+					'User-Agent': random.choice(_user_agents),
+					'Accept-Language': 'en-US,en;q=0.9',
+				}
+				url = eng_template.format(query=_requests.utils.quote(query))
+				r = _requests.get(url, headers=headers, proxies=proxies, timeout=25, verify=False)
+				if not r.ok:
+					logger.debug(f'HUMINT Jobs: {eng_name} returned {r.status_code} for {source_name}')
 					continue
-				job_url = link_tag.get('href', '')
-				job_title = title_el.get_text(strip=True) if title_el else ''
-				snippet = snippet_el.get_text(strip=True) if snippet_el else ''
-				combined_text = f'{job_title} {snippet}'
-				# Extract technologies
-				job_techs = []
-				for pat in TECH_PATTERNS:
-					for m in _re.finditer(pat, combined_text, _re.IGNORECASE):
-						t = m.group(0).strip()
-						job_techs.append(t)
-						all_techs.add(t)
-				if job_title:
-					try:
-						HumintJobPosting.objects.get_or_create(
-							scan_history=scan_history,
-							url=job_url[:1000] or 'unknown',
-							defaults={
-								'target_domain': domain,
-								'title': job_title[:500],
-								'company': company[:300],
-								'source': source_name,
-								'technologies': list(set(job_techs))[:20],
-								'raw_description': snippet[:2000],
-							}
-						)
-						total_jobs += 1
-					except Exception as e:
-						logger.debug(f'HUMINT Jobs: save error: {e}')
-		except Exception as e:
-			logger.debug(f'HUMINT Jobs: source {source_name} error: {e}')
+				soup = BeautifulSoup(r.text, 'lxml')
+				# Generic: find all links, filter by content
+				for link_tag in soup.find_all('a', href=True):
+					job_url = link_tag.get('href', '')
+					title_text = link_tag.get_text(strip=True)
+					if not title_text or len(title_text) < 5:
+						continue
+					# Find surrounding snippet text
+					parent = link_tag.find_parent(['li', 'div'])
+					snippet = ''
+					if parent:
+						snippet_el = parent.find('p') or parent.find('span', class_=True)
+						snippet = snippet_el.get_text(strip=True) if snippet_el else ''
+					combined_text = f'{title_text} {snippet}'
+					# Extract technologies
+					job_techs = []
+					for pat in TECH_PATTERNS:
+						for m in _re.finditer(pat, combined_text, _re.IGNORECASE):
+							t = m.group(0).strip()
+							job_techs.append(t)
+							all_techs.add(t)
+					if title_text and job_techs:
+						try:
+							HumintJobPosting.objects.get_or_create(
+								scan_history=scan_history,
+								url=job_url[:1000] or 'unknown',
+								defaults={
+									'target_domain': domain,
+									'title': title_text[:500],
+									'company': company[:300],
+									'source': source_name,
+									'technologies': list(set(job_techs))[:20],
+									'raw_description': snippet[:2000],
+								}
+							)
+							total_jobs += 1
+							source_found = True
+						except Exception as e:
+							logger.debug(f'HUMINT Jobs: save error: {e}')
+			except Exception as e:
+				logger.debug(f'HUMINT Jobs: {eng_name}/{source_name} error: {e}')
+		# Delay between sources
+		time.sleep(random.randint(3, 6))
 
 	logger.info(
 		f'HUMINT Job Postings: {total_jobs} postings, '
@@ -1581,9 +1630,8 @@ def sigint_passive_intel(config, host, scan_history_id, results_dir, ctx=None):
 	"""Collect passive threat intelligence from Shodan and Censys
 	for all IP addresses already discovered for this scan.
 
-	Requires:
-	  - SHODAN_API_KEY in Django settings (for Shodan)
-	  - CENSYS_API_ID + CENSYS_API_SECRET (for Censys)
+	Requires API keys to be configured via the web UI:
+	  Settings → API Vault → Shodan / Censys
 	Falls back gracefully when keys are not configured.
 	"""
 	if ctx is None:
@@ -1594,11 +1642,12 @@ def sigint_passive_intel(config, host, scan_history_id, results_dir, ctx=None):
 	scan_history = ScanHistory.objects.get(pk=scan_history_id)
 	domain_obj = scan_history.domain
 
-	from django.conf import settings as _dj_s
-
-	shodan_key = getattr(_dj_s, 'SHODAN_API_KEY', None)
-	censys_id = getattr(_dj_s, 'CENSYS_API_ID', None)
-	censys_secret = getattr(_dj_s, 'CENSYS_API_SECRET', None)
+	# Read API keys from the database (configured via Settings → API Vault in the UI)
+	_shodan_obj = ShodanAPIKey.objects.first()
+	shodan_key = _shodan_obj.key if _shodan_obj and _shodan_obj.key else None
+	_censys_obj = CensysAPIKey.objects.first()
+	censys_id = _censys_obj.api_id if _censys_obj and _censys_obj.api_id else None
+	censys_secret = _censys_obj.secret if _censys_obj and _censys_obj.secret else None
 
 	# Collect unique IPs from this scan
 	ip_qs = IpAddress.objects.filter(
@@ -2750,7 +2799,11 @@ def port_scan(self, hosts=None, ctx=None, description=None):
 			sigs.append(sig)
 		task = group(sigs).apply_async()
 		with allow_join_result():
-			results = task.get()
+			try:
+				results = task.get()
+			except ChordError as e:
+				logger.warning(f'port_scan nmap: chord aborted (scan likely stopped): {e}')
+				results = []
 
 	return ports_data
 
@@ -3242,8 +3295,12 @@ def fetch_url(self, urls=None, ctx=None, description=None):
 
 	# Run all commands
 	task = chord(tasks)(cleanup)
-	with allow_join_result():
-		task.get()
+	try:
+		with allow_join_result():
+			task.get()
+	except ChordError as e:
+		logger.warning(f'fetch_url: chord aborted (scan likely stopped): {e}')
+		return None
 
 	# Store all the endpoints and run httpx
 	with open(self.output_path) as f:
@@ -3442,6 +3499,8 @@ def vulnerability_scan(self, urls=None, ctx=None, description=None):
 	try:
 		with allow_join_result():
 			job.get(timeout=7200, interval=5)
+	except ChordError as e:
+		logger.warning(f'Vulnerability scan: chord aborted (scan likely stopped): {e}')
 	except Exception as e:
 		logger.error(f'Vulnerability scan error or timeout: {e}')
 
@@ -3651,7 +3710,10 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 
 		unique_vulns = list(unique_vulns)
 
-		with concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_THREADS) as executor:
+		# Ollama runs locally — limit concurrent LLM requests to avoid OOM.
+		# OpenAI API can handle more parallelism than local Ollama.
+		_llm_workers = 1 if use_ollama else min(DEFAULT_THREADS, 5)
+		with concurrent.futures.ThreadPoolExecutor(max_workers=_llm_workers) as executor:
 			future_to_gpt = {executor.submit(get_vulnerability_gpt_report, vuln): vuln for vuln in unique_vulns}
 
 			# Wait for all tasks to complete
@@ -3772,7 +3834,10 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	should_fetch_gpt_report = config.get(FETCH_GPT_REPORT, DEFAULT_GET_GPT_REPORT)
-	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
+	# NOTE: nuclei/DAST tools run WITHOUT proxy intentionally.
+	# Free proxies modify/buffer payloads which breaks vulnerability detection:
+	# probing through a proxy that filters or alt-responds causes missed detections.
+	# IP rotation is applied only in passive/discovery phases (subfinder, gau, dorking).
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
@@ -3863,13 +3928,15 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += formatted_headers
+	# NOTE: nuclei runs direct (no proxy) so payload delivery is not filtered.
+	# Proxy-based IP rotation happens in passive/discovery phases only.
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
-	cmd += f' -proxy {proxy} ' if proxy else ''
 	cmd += f' -retries {retries}' if retries > 0 else ''
 	cmd += f' -rl {rate_limit}' if rate_limit > 0 else ''
-	# cmd += f' -severity {severities_str}'
-	cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
+	# Enforce a minimum 10s timeout — DAST probes need more than the default 5s.
+	effective_timeout = max(timeout, 10) if timeout and timeout > 0 else 10
+	cmd += f' -timeout {str(effective_timeout)}'
 	cmd += f' -tags {tags}' if tags else ''
 	if exclude_tags:
 		cmd += f' -etags {",".join(exclude_tags)}'
@@ -3906,6 +3973,8 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	try:
 		with allow_join_result():
 			job.get(timeout=7200, interval=5)
+	except ChordError as e:
+		logger.warning(f'nuclei_scan: chord aborted (scan likely stopped): {e}')
 	except Exception as e:
 		logger.error(f'Vulnerability scan with all severities error or timeout: {e}')
 
@@ -3936,7 +4005,6 @@ def dalfox_xss_scan(self, urls=None, ctx=None, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
@@ -3965,7 +4033,6 @@ def dalfox_xss_scan(self, urls=None, ctx=None, description=None):
 	cmd += f' --ignore-return 302,404,403'
 	cmd += f' --skip-bav'
 	cmd += f' file {input_path}'
-	cmd += f' --proxy {proxy}' if proxy else ''
 	cmd += f' --waf-evasion' if is_waf_evasion else ''
 	cmd += f' -b {blind_xss_server}' if blind_xss_server else ''
 	cmd += f' --delay {delay}' if delay else ''
@@ -4041,7 +4108,8 @@ def dalfox_xss_scan(self, urls=None, ctx=None, description=None):
 		for vuln in vulns:
 			_vulns.append((vuln.name, vuln.http_url))
 
-		with concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_THREADS) as executor:
+		_llm_workers = 1 if use_ollama else min(DEFAULT_THREADS, 5)
+		with concurrent.futures.ThreadPoolExecutor(max_workers=_llm_workers) as executor:
 			future_to_gpt = {executor.submit(get_vulnerability_gpt_report, vuln): vuln for vuln in _vulns}
 
 			# Wait for all tasks to complete
@@ -4077,7 +4145,6 @@ def crlfuzz_scan(self, urls=None, ctx=None, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
 	user_agent = vuln_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	threads = vuln_config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	input_path = f'{self.results_dir}/input_endpoints_crlf.txt'
@@ -4100,7 +4167,6 @@ def crlfuzz_scan(self, urls=None, ctx=None, description=None):
 	# command builder
 	cmd = 'crlfuzz -s'
 	cmd += f' -l {input_path}'
-	cmd += f' -x {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += formatted_headers
@@ -4177,7 +4243,8 @@ def crlfuzz_scan(self, urls=None, ctx=None, description=None):
 		for vuln in vulns:
 			_vulns.append((vuln.name, vuln.http_url))
 
-		with concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_THREADS) as executor:
+		_llm_workers = 1 if use_ollama else min(DEFAULT_THREADS, 5)
+		with concurrent.futures.ThreadPoolExecutor(max_workers=_llm_workers) as executor:
 			future_to_gpt = {executor.submit(get_vulnerability_gpt_report, vuln): vuln for vuln in _vulns}
 
 			# Wait for all tasks to complete
@@ -4303,13 +4370,14 @@ def http_crawl(
 	if len(urls) < threads:
 		threads = len(urls)
 
-	# Get random proxy
-	proxy = get_random_proxy(proxy_mode=self.proxy_mode)
+	# Do NOT use proxy for http_crawl — httpx probes target's actual HTTP
+	# response (content_length, page_title, status_code). Using a proxy here
+	# causes free proxies to return error pages → mass deduplication → fewer
+	# endpoints for vulnerability scanning. Proxy is only for passive tools.
 
 	# Run command
 	cmd += f' -cl -ct -rt -location -td -websocket -cname -asn -cdn -probe -random-agent'
 	cmd += f' -t {threads}' if threads > 0 else ''
-	cmd += f' --http-proxy {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += formatted_headers
@@ -5879,66 +5947,107 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 	"""
 	_BLOCK_SIGNAL = 'temporarily blocked your IP'
 
-	results = []
-	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t {lookup_target} -d {delay} -p {page_count}'
-	proxy = get_random_proxy(proxy_mode=getattr(scan_history, 'cfg_proxy_mode', 'auto'))
+	_proxy_mode = getattr(scan_history, 'cfg_proxy_mode', 'auto') if scan_history else 'auto'
+	_scan_id = scan_history.id if scan_history else None
 
-	if lookup_extensions:
-		gofuzz_command += f' -e {lookup_extensions}'
-	elif lookup_keywords:
-		gofuzz_command += f' -w {lookup_keywords}'
+	# Build a priority list of proxies to try, cycling through up to 5 different
+	# ones before giving up.  None sentinel = "run without proxy" (last resort
+	# when proxy_mode is 'auto').
+	_candidate_proxies = []
+	if _proxy_mode != 'none':
+		try:
+			proxy_obj = Proxy.objects.first()
+			if proxy_obj and proxy_obj.use_proxy and proxy_obj.proxies.strip():
+				_raw = [p.strip() for p in proxy_obj.proxies.strip().splitlines() if p.strip()]
+				random.shuffle(_raw)
+				_candidate_proxies = _raw[:5]
+		except Exception:
+			pass
 
-	if proxy:
-		# GooFuzz -r flag expects bare IP:PORT, not http://IP:PORT
-		gofuzz_proxy = proxy.split('://', 1)[-1]
-		gofuzz_command += f' -r {gofuzz_proxy}'
-		logger.debug(f'GooFuzz: using proxy {gofuzz_proxy}')
+	# Fallback to no-proxy when in auto mode; or just use [None] if no proxies configured
+	if _proxy_mode == 'auto':
+		_proxies_to_try = _candidate_proxies + [None]
+	elif _candidate_proxies:
+		_proxies_to_try = _candidate_proxies
 	else:
-		logger.debug('GooFuzz: no proxy configured — running without proxy (risk of IP block)')
+		_proxies_to_try = [None]
+
+	# Base command (without proxy and output flags — added per-attempt)
+	gofuzz_base = f'{GOFUZZ_EXEC_PATH} -t {lookup_target} -d {delay} -p {page_count}'
+	if lookup_extensions:
+		gofuzz_base += f' -e {lookup_extensions}'
+	elif lookup_keywords:
+		gofuzz_base += f' -w {lookup_keywords}'
 
 	output_file = f'{results_dir}/gofuzz.txt'
-	gofuzz_command += f' -o {output_file}'
 	history_file = f'{results_dir}/commands.txt'
 
-	try:
-		return_code, output = run_command(
-			gofuzz_command,
-			shell=False,
-			history_file=history_file,
-			scan_id=scan_history.id,
-		)
+	for _attempt, _proxy in enumerate(_proxies_to_try):
+		gofuzz_command = gofuzz_base
+		if _proxy:
+			gofuzz_proxy = _proxy.split('://', 1)[-1]
+			gofuzz_command += f' -r {gofuzz_proxy}'
+			if _attempt == 0:
+				logger.debug(f'GooFuzz: using proxy {gofuzz_proxy}')
+			else:
+				logger.info(f'GooFuzz: retry #{_attempt} with proxy {gofuzz_proxy} (previous was blocked)')
+		else:
+			if _attempt > 0:
+				logger.warning(f'GooFuzz: all {_attempt} proxies blocked — falling back to no proxy for {lookup_target}')
+			else:
+				logger.debug('GooFuzz: no proxy configured — running without proxy (risk of IP block)')
 
-		# Detect Google IP block via return code 1 or output message
-		combined_output = (output or '').lower()
-		if return_code == 1 or _BLOCK_SIGNAL.lower() in combined_output:
-			logger.warning(
-				f'GooFuzz IP blocked by Google (rc={return_code}, target={lookup_target}). '
-				'Add/enable a proxy in Settings → Proxy to avoid blocks.'
+		gofuzz_command += f' -o {output_file}'
+
+		try:
+			return_code, output = run_command(
+				gofuzz_command,
+				shell=False,
+				history_file=history_file,
+				scan_id=_scan_id,
 			)
-			return _GOOFUZZ_BLOCKED
 
-		if not os.path.isfile(output_file):
+			# Detect Google IP block via return code 1 or output message
+			combined_output = (output or '').lower()
+			if return_code == 1 or _BLOCK_SIGNAL.lower() in combined_output:
+				remaining = len(_proxies_to_try) - _attempt - 1
+				logger.warning(
+					f'GooFuzz IP blocked by Google (rc={return_code}, proxy={_proxy or "none"}, '
+					f'target={lookup_target}).'
+					+ (f' Trying next proxy ({remaining} remaining)...' if remaining else ' All proxies exhausted.')
+				)
+				continue  # try next proxy in rotation
+
+			# Success — parse results
+			results = []
+			if not os.path.isfile(output_file):
+				return results
+
+			with open(output_file) as f:
+				for line in f.readlines():
+					url = line.strip()
+					if url:
+						results.append(url)
+						dork, created = Dork.objects.get_or_create(
+							type=type,
+							url=url
+						)
+						if scan_history:
+							scan_history.dorks.add(dork)
+
+			os.remove(output_file)
 			return results
 
-		with open(output_file) as f:
-			for line in f.readlines():
-				url = line.strip()
-				if url:
-					results.append(url)
-					dork, created = Dork.objects.get_or_create(
-						type=type,
-						url=url
-					)
-					if scan_history:
-						scan_history.dorks.add(dork)
+		except Exception as e:
+			logger.exception(e)
+			return []
 
-		# remove output file
-		os.remove(output_file)
-
-	except Exception as e:
-		logger.exception(e)
-
-	return results
+	# All proxy options tried — Google is blocking every available IP
+	logger.error(
+		f'GooFuzz: all {len(_proxies_to_try)} proxy option(s) exhausted for {lookup_target}. '
+		'Google has blocked every available IP. Configure more proxies in Settings → Proxy.'
+	)
+	return _GOOFUZZ_BLOCKED
 
 def save_metadata_info(meta_dict):
 	"""Extract metadata from Google Search.
@@ -6095,6 +6204,20 @@ def save_endpoint(
 			urls=[http_url],
 			method='HEAD',
 			ctx=ctx)
+		# If proxy was configured but returned no results, retry without proxy.
+		# Public proxies often pass TCP checks but fail HTTP tunneling, causing
+		# the initial root-domain probe to silently return nothing — which then
+		# cascades into 0 endpoints and 0 vulnerability results for the whole scan.
+		if not results and ctx.get('proxy_mode', 'auto') != 'none':
+			logger.warning(
+				f'Initial probe of {http_url} returned no results (proxy may have failed). '
+				'Retrying without proxy.'
+			)
+			fallback_ctx = {**ctx, 'proxy_mode': 'none', 'track': False}
+			results = http_crawl(
+				urls=[http_url],
+				method='HEAD',
+				ctx=fallback_ctx)
 		if results:
 			endpoint_data = results[0]
 			endpoint_id = endpoint_data['endpoint_id']

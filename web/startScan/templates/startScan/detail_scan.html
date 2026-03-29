@@ -106,7 +106,7 @@ Scan Findings
 								<h5 class="mt-0 mb-0 font-15">
 									Scan Status for <span class="badge badge-soft-primary">{{history.domain.name}}</span>
 								</h5>
-								<p class="mt-1 mb-0 text-muted font-14">
+								<p id="live-scan-status" class="mt-1 mb-0 text-muted font-14">
 									{% if history.scan_status == -1 %}
 									<span class="mdi mdi-circle text-warning"></span>
 									<span class="badge badge-soft-warning">Pending</span>
@@ -138,6 +138,10 @@ Scan Findings
 									<a class="dropdown-item" href="javascript:download_important_subdomains({{scan_history_id}}, '{{history.domain.name}}');">Download Important Subdomains</a>
 									<a class="dropdown-item" href="javascript:download_interesting_subdomains({{scan_history_id}}, '{{history.domain.name}}');">Download Interesting Subdomains</a>
 									<a class="dropdown-item" href="javascript:download_interesting_endpoints({{scan_history_id}}, '{{history.domain.name}}');">Download Interesting Endpoints</a>
+									{% if history.scan_status == 3 or history.scan_status == 0 %}
+									<div class="dropdown-divider"></div>
+									<a class="dropdown-item text-success" href="javascript:continue_scan({{scan_history_id}})"><i class="fe-play"></i>&nbsp;Continue Scan</a>
+									{% endif %}
 								</div>
 							</div>
 						</div>
@@ -349,7 +353,7 @@ Scan Findings
 							<div class="card-body">
 								<i class="fa fa-info-circle text-muted float-end" data-bs-container="#tooltip-container" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Total Subdomains Discovered by reNgine during this scan"></i>
 								<h4 class="mt-0 font-16">Subdomains Discovered</h4>
-								<h2 class="text-primary my-3 text-center"><span data-plugin="counterup">{{subdomain_count|intcomma}}</span></h2>
+								<h2 class="text-primary my-3 text-center"><span id="live-subdomain-count" data-plugin="counterup">{{subdomain_count|intcomma}}</span></h2>
 								<br>
 								<p class="mb-0"><span class="badge badge-soft-success">Alive Subdomains: {{alive_count}}</span></p>
 							</div>
@@ -361,7 +365,7 @@ Scan Findings
 							<div class="card-body">
 								<i class="fa fa-info-circle text-muted float-end" data-bs-container="#tooltip-container1" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Total Endpoints discovered by reNgine during this scan. This includes any URLs discovered."></i>
 								<h4 class="mt-0 font-16">Endpoints Discovered</h4>
-								<h2 class="text-primary my-3 text-center"><span data-plugin="counterup">{{endpoint_count|intcomma}}</span></h2>
+								<h2 class="text-primary my-3 text-center"><span id="live-endpoint-count" data-plugin="counterup">{{endpoint_count|intcomma}}</span></h2>
 								<br>
 								<p class="text-success mb-0"><span class="badge badge-soft-success">Alive Endpoints: {{endpoint_alive_count}}</span></p>
 							</div>
@@ -373,7 +377,7 @@ Scan Findings
 							<div class="card-body">
 								<i class="fa fa-info-circle text-muted float-end" data-bs-container="#tooltip-container2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Total Vulnerabilities discovered by reNgine. This will be populated only if vulnerability scan is performed during this scan."></i>
 								<h4 class="mt-0 font-16">Vulnerabilities Discovered</h4>
-								<h2 class="text-danger my-3 text-center"><span data-plugin="counterup">{{total_vulnerability_count|intcomma}}</span></h2>
+								<h2 class="text-danger my-3 text-center"><span id="live-vuln-count" data-plugin="counterup">{{total_vulnerability_count|intcomma}}</span></h2>
 								{% if total_vulnerability_count > 0 %}
 								<p class="text-muted mb-0">
 									<span class="w-title text-danger">{{critical_count}} Critical, {{high_count}} High, {{medium_count}} Medium</span>
@@ -1226,16 +1230,16 @@ Scan Findings
 					<div class="card-body">
 						<h4 class="header-title mb-0">
 							<span id="humint-employees-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
-							Profil Karyawan (HUMINT)
+							Employee Profile (HUMINT)
 						</h4>
 						<table class="table mt-3 table-sm">
 							<thead class="table-light">
 								<tr>
-									<th>Nama</th>
-									<th>Jabatan</th>
+									<th>Name</th>
+									<th>Position</th>
 									<th>Email</th>
-									<th>Sumber</th>
-									<th>Tautan</th>
+									<th>Source</th>
+									<th>Links</th>
 								</tr>
 							</thead>
 							<tbody id="humint-employees-tbody"></tbody>
@@ -1249,15 +1253,15 @@ Scan Findings
 					<div class="card-body">
 						<h4 class="header-title mb-0">
 							<span id="humint-jobs-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
-							Lowongan Kerja &amp; Tech Stack
+							Job Openings &amp; Tech Stack
 						</h4>
 						<table class="table mt-3 table-sm">
 							<thead class="table-light">
 								<tr>
-									<th>Posisi</th>
-									<th>Perusahaan</th>
-									<th>Teknologi Terdeteksi</th>
-									<th>Sumber</th>
+									<th>Position</th>
+									<th>Company</th>
+									<th>Detected Technology</th>
+									<th>Source</th>
 								</tr>
 							</thead>
 							<tbody id="humint-jobs-tbody"></tbody>
@@ -1287,7 +1291,7 @@ Scan Findings
 					<div class="card-body">
 						<h4 class="header-title mb-0">
 							<span id="sigint-email-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
-							Keamanan Email (SPF / DKIM / DMARC)
+							Email Security (SPF / DKIM / DMARC)
 						</h4>
 						<table class="table mt-3 table-sm">
 							<thead class="table-light">
@@ -1295,8 +1299,8 @@ Scan Findings
 									<th>Domain</th>
 									<th>SPF</th>
 									<th>DMARC</th>
-									<th>Penyedia Mail</th>
-									<th>Risiko Spoofing</th>
+									<th>Email Provider</th>
+									<th>Spoofing Risk</th>
 								</tr>
 							</thead>
 							<tbody id="sigint-email-tbody"></tbody>
@@ -1316,10 +1320,10 @@ Scan Findings
 							<thead class="table-light">
 								<tr>
 									<th>ASN</th>
-									<th>Organisasi</th>
-									<th>Negara</th>
+									<th>Organization</th>
+									<th>Country</th>
 									<th>CIDR Ranges</th>
-									<th>Jml IP</th>
+									<th>Total IP</th>
 								</tr>
 							</thead>
 							<tbody id="sigint-asn-tbody"></tbody>
@@ -1340,7 +1344,7 @@ Scan Findings
 								<tr>
 									<th>IP</th>
 									<th>Org / ISP</th>
-									<th>Port Terbuka</th>
+									<th>Open Port</th>
 									<th>CVE</th>
 									<th>Tag</th>
 								</tr>
@@ -1356,15 +1360,15 @@ Scan Findings
 					<div class="card-body">
 						<h4 class="header-title mb-0">
 							<span id="sigint-cert-count"><span class="spinner-border spinner-border-sm me-1"></span></span>
-							Analisis Sertifikat TLS
+							TLS Certificate Analysis
 						</h4>
 						<table class="table mt-3 table-sm">
 							<thead class="table-light">
 								<tr>
 									<th>Common Name</th>
 									<th>Issuer</th>
-									<th>Kedaluwarsa</th>
-									<th>Algoritma</th>
+									<th>Expired</th>
+									<th>Algorithm</th>
 									<th>Status</th>
 								</tr>
 							</thead>
@@ -2888,5 +2892,108 @@ $(document).ready(function() {
 	});
 
 });
+</script>
+
+<script>
+// ─── Continue stopped/failed scan ───────────────────────────────────────────
+function continue_scan(scan_id) {
+	Swal.fire({
+		title: 'Continue Scan?',
+		html: 'A new scan will start with all previously discovered subdomains pre-imported, skipping subdomain enumeration.',
+		icon: 'info',
+		showCancelButton: true,
+		confirmButtonText: 'Yes, Continue',
+		cancelButtonText: 'Cancel',
+	}).then((result) => {
+		if (!result.isConfirmed) return;
+		Swal.fire({ title: 'Starting...', allowOutsideClick: false });
+		swal.showLoading();
+		fetch('/api/action/continue/scan/', {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: {
+				'X-CSRFToken': getCookie('csrftoken'),
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({ scan_id: scan_id }),
+		})
+		.then(r => r.json())
+		.then(function(data) {
+			swal.close();
+			if (data.status) {
+				Snackbar.show({ text: data.message, pos: 'top-right', duration: 4000 });
+				setTimeout(function() {
+					location.reload();
+				}, 1500);
+			} else {
+				Swal.fire({ title: 'Error!', text: data.message, icon: 'error' });
+			}
+		})
+		.catch(function(e) {
+			swal.close();
+			Swal.fire({ title: 'Error!', text: String(e), icon: 'error' });
+		});
+	});
+}
+
+// ─── Live scan auto-refresh ──────────────────────────────────────────────────
+// Polls /api/scan/live/ every 10 s while the scan is running.
+// Updates counters and DataTables in-place; reloads the full page on completion.
+(function () {
+	var RUNNING = 1;
+	var INITIAL_STATUS = {{ history.scan_status }};
+	var SCAN_ID = {{ scan_history_id }};
+	var POLL_MS = 10000;
+	var _timer = null;
+
+	if (INITIAL_STATUS !== RUNNING) return;  // already finished — no polling needed
+
+	function statusHtml(s) {
+		if (s === -1) return '<span class="mdi mdi-circle text-warning"></span><span class="badge badge-soft-warning">Pending</span>';
+		if (s === 0)  return '<span class="mdi mdi-circle text-danger"></span><span class="badge badge-soft-danger">Failed</span>';
+		if (s === 1)  return '<span class="mdi mdi-circle text-warning"></span><span class="badge badge-soft-warning">In Progress</span>';
+		if (s === 2)  return '<span class="mdi mdi-circle text-success"></span><span class="badge badge-soft-success">Completed</span>';
+		if (s === 3)  return '<span class="mdi mdi-circle text-danger"></span><span class="badge badge-soft-danger">Aborted</span>';
+		return '<span class="mdi mdi-circle text-danger"></span><span class="badge badge-danger">Unknown</span>';
+	}
+
+	function poll() {
+		fetch('/api/scan/live/?scan_id=' + SCAN_ID, {credentials: 'same-origin'})
+			.then(function (r) { return r.json(); })
+			.then(function (data) {
+				// Update counters
+				var sdEl = document.getElementById('live-subdomain-count');
+				var epEl = document.getElementById('live-endpoint-count');
+				var vlEl = document.getElementById('live-vuln-count');
+				if (sdEl) sdEl.textContent = data.subdomain_count;
+				if (epEl) epEl.textContent = data.endpoint_count;
+				if (vlEl) vlEl.textContent = data.vulnerability_count;
+
+				// Update status badge text
+				var statusEl = document.getElementById('live-scan-status');
+				if (statusEl) statusEl.innerHTML = statusHtml(data.scan_status);
+
+				// Keep DataTables fresh (null = keep current page, false = don't reset paging)
+				if (typeof subdomain_datatables !== 'undefined') {
+					subdomain_datatables.ajax.reload(null, false);
+				}
+				if (typeof vulnerability_table !== 'undefined') {
+					vulnerability_table.ajax.reload(null, false);
+				}
+
+				// Stop polling and reload once scan reaches a terminal state
+				if (data.scan_status !== RUNNING) {
+					clearInterval(_timer);
+					_timer = null;
+					setTimeout(function () { location.reload(); }, 3000);
+				}
+			})
+			.catch(function (err) {
+				console.warn('[live-scan] poll error:', err);
+			});
+	}
+
+	_timer = setInterval(poll, POLL_MS);
+})();
 </script>
 {% endblock page_level_script %}

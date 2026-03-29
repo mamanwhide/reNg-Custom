@@ -63,6 +63,23 @@ class HackerOneAPIKey(models.Model):
 		return self.username
 
 
+class ShodanAPIKey(models.Model):
+	id = models.AutoField(primary_key=True)
+	key = models.CharField(max_length=500)
+
+	def __str__(self):
+		return f'****...{self.key[-4:]}' if len(self.key) > 4 else '****'
+
+
+class CensysAPIKey(models.Model):
+	id = models.AutoField(primary_key=True)
+	api_id = models.CharField(max_length=500)
+	secret = models.CharField(max_length=500)
+
+	def __str__(self):
+		return f'****...{self.api_id[-4:]}' if len(self.api_id) > 4 else '****'
+
+
 class InAppNotification(models.Model):
 	project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=True)
 	notification_type = models.CharField(max_length=10, choices=NOTIFICATION_TYPES, default='system')

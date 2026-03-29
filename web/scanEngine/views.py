@@ -546,6 +546,9 @@ def api_vault(request, slug):
         key_chaos = request.POST.get('key_chaos')
         key_hackerone = request.POST.get('key_hackerone')
         username_hackerone = request.POST.get('username_hackerone')
+        key_shodan = request.POST.get('key_shodan')
+        censys_api_id = request.POST.get('censys_api_id')
+        censys_secret = request.POST.get('censys_secret')
 
 
         if key_openai:
@@ -580,9 +583,26 @@ def api_vault(request, slug):
                 hackerone_api_key.save()
             else:
                 HackerOneAPIKey.objects.create(
-                    username=username_hackerone, 
+                    username=username_hackerone,
                     key=key_hackerone
                 )
+
+        if key_shodan:
+            shodan_obj = ShodanAPIKey.objects.first()
+            if shodan_obj:
+                shodan_obj.key = key_shodan
+                shodan_obj.save()
+            else:
+                ShodanAPIKey.objects.create(key=key_shodan)
+
+        if censys_api_id and censys_secret:
+            censys_obj = CensysAPIKey.objects.first()
+            if censys_obj:
+                censys_obj.api_id = censys_api_id
+                censys_obj.secret = censys_secret
+                censys_obj.save()
+            else:
+                CensysAPIKey.objects.create(api_id=censys_api_id, secret=censys_secret)
 
     openai_key = OpenAiAPIKey.objects.first()
     netlas_key = NetlasAPIKey.objects.first()
@@ -595,12 +615,17 @@ def api_vault(request, slug):
         hackerone_key = None
         hackerone_username = None
 
+    shodan_key = ShodanAPIKey.objects.first()
+    censys_key = CensysAPIKey.objects.first()
+
     context['openai_key'] = openai_key
     context['netlas_key'] = netlas_key
     context['chaos_key'] = chaos_key
     context['hackerone_key'] = hackerone_key
     context['hackerone_username'] = hackerone_username
-    
+    context['shodan_key'] = shodan_key
+    context['censys_key'] = censys_key
+
     return render(request, 'scanEngine/settings/api.html', context)
 
 
