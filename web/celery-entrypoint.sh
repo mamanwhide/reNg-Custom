@@ -253,7 +253,36 @@ fi
 
 echo "Starting Celery Workers..."
 
-# Main scan worker — execute directly (no eval)
+# ─────────────────────────────────────────────────────────────────────
+# CONSOLIDATED WORKER LAYOUT (6 processes instead of 22)
+#
+# Memory savings: ~3.2 GB (16 fewer Python/Django processes × ~200MB)
+#
+# Worker 1: main_scan     (prefork) — heavy CPU-bound scan tasks
+# Worker 2: api           (gevent)  — API shared tasks
+# Worker 3: orchestration (gevent)  — scan lifecycle: initiate, subscan, report
+# Worker 4: notification  (gevent)  — all notification channels
+# Worker 5: osint         (gevent)  — OSINT/recon tasks
+# Worker 6: utility       (gevent)  — lightweight helpers: nmap parse, geo, whois, llm, etc.
+# ─────────────────────────────────────────────────────────────────────
+
+# Helper to start a gevent worker listening on multiple queues
+start_consolidated_worker() {
+    local queues=$1
+    local concurrency=$2
+    local worker_name=$3
+
+    if [ "$DEBUG" == "1" ]; then
+        watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/reNgine/" -- \
+            celery -A reNgine.tasks worker --pool=gevent --optimization=fair \
+            --autoscale=$concurrency,1 --loglevel=$loglevel -Q "$queues" -n "$worker_name" &
+    else
+        celery -A reNgine.tasks worker --pool=gevent --optimization=fair \
+            --autoscale=$concurrency,1 --loglevel=$loglevel -Q "$queues" -n "$worker_name" &
+    fi
+}
+
+# 1. Main scan worker (prefork) — nuclei, nmap, httpx, dalfox, etc.
 if [ "$DEBUG" == "1" ]; then
     watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/reNgine/" -- \
         celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair \
@@ -263,60 +292,35 @@ else
         --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &
 fi
 
-# API shared task worker
+# 2. API shared task worker
 if [ "$DEBUG" == "1" ]; then
     watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/api/" -- \
         celery -A api.shared_api_tasks worker --pool=gevent --optimization=fair \
-        --concurrency=30 --loglevel=$loglevel -Q api_queue -n api_worker &
+        --concurrency=20 --loglevel=$loglevel -Q api_queue -n api_worker &
 else
-    celery -A api.shared_api_tasks worker --pool=gevent --concurrency=30 \
+    celery -A api.shared_api_tasks worker --pool=gevent --concurrency=20 \
         --optimization=fair --loglevel=$loglevel -Q api_queue -n api_worker &
 fi
 
-# Start all queue-specific workers directly (no eval/string building)
-start_worker() {
-    local queue=$1
-    local concurrency=$2
-    local worker_name=$3
+# 3. Orchestration worker — scan lifecycle
+start_consolidated_worker \
+    "initiate_scan_queue,subscan_queue,report_queue" \
+    20 "orchestration_worker"
 
-    if [ "$DEBUG" == "1" ]; then
-        watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/reNgine/" -- \
-            celery -A reNgine.tasks worker --pool=gevent --optimization=fair \
-            --autoscale=$concurrency,1 --loglevel=$loglevel -Q $queue -n $worker_name &
-    else
-        celery -A reNgine.tasks worker --pool=gevent --optimization=fair \
-            --autoscale=$concurrency,1 --loglevel=$loglevel -Q $queue -n $worker_name &
-    fi
-}
+# 4. Notification worker — all notification channels
+start_consolidated_worker \
+    "send_notif_queue,send_task_notif_queue,send_scan_notif_queue,send_file_to_discord_queue,send_hackerone_report_queue" \
+    10 "notification_worker"
 
-# worker format: "queue_name:concurrency:worker_name"
-workers=(
-    "initiate_scan_queue:30:initiate_scan_worker"
-    "subscan_queue:30:subscan_worker"
-    "report_queue:20:report_worker"
-    "send_notif_queue:10:send_notif_worker"
-    "send_task_notif_queue:10:send_task_notif_worker"
-    "send_file_to_discord_queue:5:send_file_to_discord_worker"
-    "send_hackerone_report_queue:5:send_hackerone_report_worker"
-    "parse_nmap_results_queue:10:parse_nmap_results_worker"
-    "geo_localize_queue:20:geo_localize_worker"
-    "query_whois_queue:10:query_whois_worker"
-    "remove_duplicate_endpoints_queue:30:remove_duplicate_endpoints_worker"
-    "run_command_queue:50:run_command_worker"
-    "query_reverse_whois_queue:10:query_reverse_whois_worker"
-    "query_ip_history_queue:10:query_ip_history_worker"
-    "llm_queue:30:llm_worker"
-    "dorking_queue:10:dorking_worker"
-    "osint_discovery_queue:10:osint_discovery_worker"
-    "h8mail_queue:10:h8mail_worker"
-    "theHarvester_queue:10:theHarvester_worker"
-    "send_scan_notif_queue:10:send_scan_notif_worker"
-)
+# 5. OSINT worker — dorking, theHarvester, h8mail, osint_discovery
+start_consolidated_worker \
+    "osint_discovery_queue,dorking_queue,theHarvester_queue,h8mail_queue" \
+    15 "osint_worker"
 
-for worker in "${workers[@]}"; do
-    IFS=':' read -r queue concurrency worker_name <<< "$worker"
-    start_worker "$queue" "$concurrency" "$worker_name"
-done
+# 6. Utility worker — nmap parse, geo, whois, dedup, run_command, llm
+start_consolidated_worker \
+    "parse_nmap_results_queue,geo_localize_queue,query_whois_queue,query_reverse_whois_queue,query_ip_history_queue,remove_duplicate_endpoints_queue,run_command_queue,llm_queue" \
+    20 "utility_worker"
 
 # Wait for all background workers
 wait
