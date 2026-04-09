@@ -64,6 +64,35 @@ ALLOWED_SCAN_TYPES = {
 }
 
 
+def sanitize_filename(name: str, max_length: int = 200) -> str:
+    """Sanitize a string for safe use in Content-Disposition filenames.
+
+    Strips characters that could cause header injection, path traversal,
+    or filesystem issues. Returns only alphanumerics, hyphens, underscores,
+    dots, and spaces.
+
+    Args:
+        name: The raw filename component (e.g. domain name).
+        max_length: Maximum allowed length for the result.
+
+    Returns:
+        Sanitized filename-safe string.
+    """
+    import re
+    if not name or not isinstance(name, str):
+        return 'export'
+    # Keep only safe characters
+    sanitized = re.sub(r'[^a-zA-Z0-9._\- ]', '_', name)
+    # Collapse multiple underscores/spaces
+    sanitized = re.sub(r'[_ ]{2,}', '_', sanitized)
+    # Strip leading/trailing dots and spaces (prevent hidden files)
+    sanitized = sanitized.strip('. ')
+    # Truncate
+    if len(sanitized) > max_length:
+        sanitized = sanitized[:max_length]
+    return sanitized or 'export'
+
+
 def validate_domain(domain: str) -> bool:
     """Validate that a string is a safe domain name.
     
@@ -232,7 +261,7 @@ def sanitize_shell_arg(value: str) -> str:
 # =============================================================================
 
 
-def is_safe_path(base_dir: str, target_path: str) -> bool:
+def is_safe_path(base_dir: str, target_path: str, follow_symlinks=True) -> bool:
     """Check if a target path is safely within the base directory.
     
     Prevents path traversal attacks (e.g., ../../etc/passwd).
@@ -240,14 +269,15 @@ def is_safe_path(base_dir: str, target_path: str) -> bool:
     Args:
         base_dir: The allowed base directory.
         target_path: The path to validate.
+        follow_symlinks: Whether to resolve symlinks (default True).
         
     Returns:
         True if target_path is within base_dir.
     """
     try:
         base = Path(base_dir).resolve()
-        target = Path(target_path).resolve()
-        return str(target).startswith(str(base))
+        target = Path(target_path).resolve() if follow_symlinks else Path(target_path).absolute()
+        return base == Path(os.path.commonpath((str(base), str(target))))
     except (ValueError, OSError):
         return False
 

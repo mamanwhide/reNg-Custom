@@ -28,8 +28,8 @@ from reNgine.database_utils import *
 from reNgine.definitions import ABORTED_TASK, INITIATED_TASK, LIVE_SCAN
 from reNgine.tasks import *
 from reNgine.llm import *
-from reNgine.utilities import is_safe_path
-from reNgine.security import sanitize_shell_arg
+from reNgine.utilities import remove_lead_and_trail_slash
+from reNgine.security import sanitize_shell_arg, is_safe_path
 from scanEngine.models import *
 from startScan.models import *
 from startScan.models import EndPoint

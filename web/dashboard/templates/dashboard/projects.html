@@ -16,7 +16,7 @@ All Projects
 {% endblock page_title %}
 
 {% block breadcrumb_title %}
-<li class="breadcrumb-item"><a href="/{{current_project.slug}}/">Dashboard</a></li>
+<li class="breadcrumb-item"><a href="{% url 'dashboardIndex' current_project.slug %}">Dashboard</a></li>
 <li class="breadcrumb-item active">Projects</li>
 {% endblock breadcrumb_title %}
 
@@ -73,7 +73,7 @@ All Projects
 {% block page_level_script %}
 <script type="text/javascript">
   function delete_project(id, project_name){
-    const delAPI = "../../delete/project/" + id;
+    const delAPI = "{% url 'delete_project' id=0 %}".replace('0', id);
     swal.queue([{
       title: 'Are you sure you want to delete '+ project_name +'?',
       text: "You won't be able to revert this, all targets and scan results also will be deleted!",

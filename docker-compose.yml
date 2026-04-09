@@ -57,6 +57,7 @@ services:
 
   celery-beat:
     build: ./web
+    restart: always
     entrypoint: /usr/src/app/beat-entrypoint.sh
     command: celery -A reNgine beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
@@ -114,7 +115,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 20
-      start_period: 180s
+      start_period: 60s
     depends_on:
       - db
       - celery

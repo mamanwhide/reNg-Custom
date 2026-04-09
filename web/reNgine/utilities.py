@@ -6,16 +6,6 @@ from celery._state import get_current_task
 from celery.utils.log import ColorFormatter
 
 
-def is_safe_path(basedir, path, follow_symlinks=True):
-	# Source: https://security.openstack.org/guidelines/dg_using-file-paths.html
-	# resolves symbolic links
-	if follow_symlinks:
-		matchpath = os.path.realpath(path)
-	else:
-		matchpath = os.path.abspath(path)
-	return basedir == os.path.commonpath((basedir, matchpath))
-
-
 # Source: https://stackoverflow.com/a/10408992
 def remove_lead_and_trail_slash(s):
 	if s.startswith('/'):

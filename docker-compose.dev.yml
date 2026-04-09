@@ -35,6 +35,7 @@ services:
       - gf_patterns:/root/.gf
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
+      - static_volume:/usr/src/app/staticfiles/
     environment:
       - DEBUG=1
       - CELERY_BROKER=redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -104,6 +105,7 @@ services:
       - gf_patterns:/root/.gf
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
+      - static_volume:/usr/src/app/staticfiles/
     ports:
       - "0.0.0.0:8000:8000"
     depends_on:
@@ -131,3 +133,4 @@ volumes:
   wordlist:
   scan_results:
   ollama_data:
+  static_volume:

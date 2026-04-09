@@ -22,3 +22,6 @@ class TodoNote(models.Model):
     is_done = models.BooleanField(default=False)
     is_important = models.BooleanField(default=False)
     project = models.ForeignKey(Project, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.title or f'TodoNote #{self.id}'

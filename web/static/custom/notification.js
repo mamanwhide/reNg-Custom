@@ -47,16 +47,16 @@ function updateNotifications() {
           notificationItem.innerHTML = `
                     <div class="notification-panel-content flex-grow-1">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="notification-panel-title mb-0">${
+                            <h6 class="notification-panel-title mb-0">${htmlEncode(
                               notification.title
-                            }</h6>
+                            )}</h6>
                             <span class="notification-panel-icon">
-                                <i class="mdi ${notification.icon}"></i>
+                                <i class="mdi ${htmlEncode(notification.icon)}"></i>
                             </span>
                         </div>
-                        <p class="notification-panel-description mb-1">${
+                        <p class="notification-panel-description mb-1">${htmlEncode(
                           notification.description
-                        }</p>
+                        )}</p>
                         <small class="notification-panel-time">${timeago.format(
                           new Date(notification.created_at)
                         )}</small>

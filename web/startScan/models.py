@@ -46,7 +46,7 @@ class ScanHistory(models.Model):
 	employees = models.ManyToManyField('Employee', related_name='employees', blank=True)
 	buckets = models.ManyToManyField('S3Bucket', related_name='buckets', blank=True)
 	dorks = models.ManyToManyField('Dork', related_name='dorks', blank=True)
-	initiated_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='initiated_scans', blank=True, null=True)
+	initiated_by = models.ForeignKey(User, on_delete=models.SET_NULL, related_name='initiated_scans', blank=True, null=True)
 	aborted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='aborted_scans')
 	# scan related configs, prefix config fields with cfg_
 	cfg_out_of_scope_subdomains = ArrayField(
@@ -625,6 +625,9 @@ class DirectoryScan(models.Model):
 	# this is used for querying which ip was discovered during subcan
 	dir_subscan_ids = models.ManyToManyField('SubScan', related_name='dir_subscan_ids', blank=True)
 
+	def __str__(self):
+		return self.command_line or f'DirectoryScan #{self.id}'
+
 
 class MetaFinderDocument(models.Model):
 	id = models.AutoField(primary_key=True)
@@ -646,6 +649,9 @@ class MetaFinderDocument(models.Model):
 	http_status = models.IntegerField(default=0, null=True, blank=True)
 	creation_date = models.CharField(max_length=1000, blank=True, null=True)
 	modified_date = models.CharField(max_length=1000, blank=True, null=True)
+
+	def __str__(self):
+		return self.doc_name or f'MetaFinderDocument #{self.id}'
 
 
 class Email(models.Model):

@@ -125,7 +125,7 @@ class DomainInfo(models.Model):
 	related_tlds = models.ManyToManyField(RelatedDomain, blank=True, related_name='related_tlds')
 	similar_domains = models.ManyToManyField(RelatedDomain, blank=True, related_name='similar_domains')
 	# historical ips
-	historical_ips = models.ManyToManyField(HistoricalIP, blank=True, related_name='similar_domains')
+	historical_ips = models.ManyToManyField(HistoricalIP, blank=True, related_name='domain_historical_ips')
 
 	def __str__(self):
 		return str(self.id)
@@ -136,7 +136,7 @@ class Organization(models.Model):
 	name = models.CharField(max_length=300, unique=True)
 	description = models.TextField(blank=True, null=True)
 	insert_date = models.DateTimeField(default=timezone.now)
-	domains = models.ManyToManyField('Domain', related_name='domains')
+	domains = models.ManyToManyField('Domain', related_name='organizations')
 	project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=False)
 
 	def __str__(self):

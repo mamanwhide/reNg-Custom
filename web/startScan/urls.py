@@ -71,7 +71,7 @@ urlpatterns = [
         views.delete_scan,
         name='delete_scan'),
     path(
-        'stop/scan/<str:id>',
+        'stop/scan/<int:id>',
         views.stop_scan,
         name='stop_scan'),
     path(

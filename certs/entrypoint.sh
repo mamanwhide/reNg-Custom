@@ -32,6 +32,7 @@ cert() {
   mv ${FILENAME}.crt ${FILENAME}.pem
   cp ca.crt ${FILENAME}_chain.pem
   mv ${FILENAME}.key ${FILENAME}_rsa.key
+  chmod 600 ${FILENAME}_rsa.key
   rm ${FILENAME}.csr
   rm client-ext.cnf
 }
@@ -51,6 +52,7 @@ if (! test -f ca.key) || (! test -f ca.crt); then
    -subj "/C=${COUNTRY_CODE}/O=${COMPANY}/CN=${AUTHORITY_NAME}"
 
   echo "01" > ca.srl
+  chmod 600 ca.key
 fi
 
 # Create a new certificate for the DOMAIN_NAME

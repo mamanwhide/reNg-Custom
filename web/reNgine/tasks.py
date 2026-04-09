@@ -20,6 +20,7 @@ from celery.exceptions import ChordError
 from celery.result import allow_join_result
 from celery.utils.log import get_task_logger
 from django.db.models import Count
+from django.db import transaction
 from dotted_dict import DottedDict
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
@@ -231,8 +232,10 @@ def initiate_scan(
 		# Run Celery chord
 		logger.info(f'Running Celery workflow with {len(workflow.tasks) + 1} tasks')
 		task = chain(workflow, callback).on_error(callback).delay()
-		scan.celery_ids.append(task.id)
-		scan.save()
+		with transaction.atomic():
+			scan_obj = ScanHistory.objects.select_for_update().get(id=scan.id)
+			scan_obj.celery_ids.append(task.id)
+			scan_obj.save(update_fields=['celery_ids'])
 
 		return {
 			'success': True,
@@ -371,8 +374,10 @@ def initiate_subscan(
 
 	# Run Celery tasks
 	task = chain(workflow, callback).on_error(callback).delay()
-	subscan.celery_ids.append(task.id)
-	subscan.save()
+	with transaction.atomic():
+		subscan_obj = SubScan.objects.select_for_update().get(id=subscan.id)
+		subscan_obj.celery_ids.append(task.id)
+		subscan_obj.save(update_fields=['celery_ids'])
 
 	return {
 		'success': True,
