@@ -580,7 +580,7 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 			qs = self.queryset.filter(
 				Q(name__icontains=search_value) |
 				Q(description__icontains=search_value) |
-				Q(domains__name__icontains=search_value)
+				Q(organizations__name__icontains=search_value)
 			)
 			return qs.order_by(order_col)
 
