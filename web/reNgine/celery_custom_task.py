@@ -174,13 +174,15 @@ class RengineTask(Task):
 		is_json_results = isinstance(self.result, dict) or isinstance(self.result, list)
 		if not self.output_path:
 			return False
-		if not os.path.exists(self.output_path):
-			with open(self.output_path, 'w') as f:
+		try:
+			with open(self.output_path, 'x') as f:
 				if is_json_results:
 					json.dump(self.result, f, indent=4)
 				else:
 					f.write(self.result)
 			logger.warning(f'Wrote {self.task_name} results to {self.output_path}')
+		except FileExistsError:
+			logger.debug(f'Results file already exists: {self.output_path}')
 
 	def create_scan_activity(self):
 		if not self.track:
@@ -189,13 +191,13 @@ class RengineTask(Task):
 		self.activity = ScanActivity(
 			name=self.task_name,
 			title=self.description,
-			time=timezone.now(),
+			created_at=timezone.now(),
 			status=RUNNING_TASK,
 			celery_id=celery_id)
 		self.activity.save()
 		self.activity_id = self.activity.id
 		if self.scan:
-			self.activity.scan_of = self.scan
+			self.activity.scan_history = self.scan
 			self.activity.save()
 			self.scan.celery_ids.append(celery_id)
 			self.scan.save()
@@ -218,7 +220,7 @@ class RengineTask(Task):
 		self.activity.status = self.status
 		self.activity.error_message = error_message
 		self.activity.traceback = self.traceback
-		self.activity.time = timezone.now()
+		self.activity.created_at = timezone.now()
 		self.activity.save()
 		self.notify()
 

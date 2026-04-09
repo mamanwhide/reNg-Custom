@@ -139,18 +139,25 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			raise Exception("API credentials error: " + str(e))
 
 		while url:
-			response = requests.get(
-				url,
-				headers=headers,
-				auth=(username, api_key)
-			)
+			try:
+				response = requests.get(
+					url,
+					headers=headers,
+					auth=(username, api_key),
+					timeout=30
+				)
+			except requests.exceptions.RequestException as e:
+				raise Exception(f"HackerOne API connection error: {e}")
 
 			if response.status_code == 401:
 				raise Exception("Invalid API credentials")
 			elif response.status_code != 200:
 				raise Exception(f"HackerOne API request failed with status code {response.status_code}")
 
-			data = response.json()
+			try:
+				data = response.json()
+			except ValueError:
+				raise Exception("HackerOne API returned invalid JSON")
 			all_programs.extend(data['data'])
 			
 			url = data['links'].get('next')
@@ -200,16 +207,23 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 		except Exception as e:
 			raise Exception("API credentials error: " + str(e))
 
-		response = requests.get(
-			url,
-			headers=headers,
-			auth=(username, api_key)
-		)
+		try:
+			response = requests.get(
+				url,
+				headers=headers,
+				auth=(username, api_key),
+				timeout=30
+			)
+		except requests.exceptions.RequestException as e:
+			raise Exception(f"HackerOne API connection error: {e}")
 
 		if response.status_code == 401:
 			raise Exception("Invalid API credentials")
 		elif response.status_code == 200:
-			return response.json()
+			try:
+				return response.json()
+			except ValueError:
+				raise Exception("HackerOne API returned invalid JSON")
 		else:
 			return None
 		
@@ -1129,14 +1143,14 @@ class StopScan(APIView):
 
 				tasks = (
 					ScanActivity.objects
-					.filter(scan_of=scan)
+					.filter(scan_history=scan)
 					.filter(status=RUNNING_TASK)
 					.order_by('-pk')
 				)
 				for task in tasks:
 					app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
 					task.status = ABORTED_TASK
-					task.time = timezone.now()
+					task.created_at = timezone.now()
 					task.save()
 
 				create_scan_activity(

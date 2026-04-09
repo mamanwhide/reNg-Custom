@@ -162,8 +162,8 @@ Dashboard
               <div class="soc-feed-item__title">{{item.title}}</div>
               <div class="soc-feed-item__meta">
                 <span>{% if item.status == 2 %}{% if item.title != 'Scan Completed' %}Completed{% endif %}{% elif item.status == 1 %}Initiated{% elif item.status == 0 %}{% if item.title != 'Scan aborted' %}Aborted{% endif %}{% endif %} for</span>
-                <span class="soc-feed-item__badge soc-feed-item__badge--info">{{item.scan_of.domain.name}}</span>
-                <span>{{item.time|naturaltime}}</span>
+                <span class="soc-feed-item__badge soc-feed-item__badge--info">{{item.scan_history.domain.name}}</span>
+                <span>{{item.created_at|naturaltime}}</span>
               </div>
             </div>
           </div>

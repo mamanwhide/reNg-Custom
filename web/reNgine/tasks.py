@@ -405,7 +405,7 @@ def report(ctx=None, description=None):
 	subscan = SubScan.objects.filter(pk=subscan_id).first()
 
 	# Get failed tasks
-	tasks = ScanActivity.objects.filter(scan_of=scan).all()
+	tasks = ScanActivity.objects.filter(scan_history=scan).all()
 	if subscan:
 		tasks = tasks.filter(celery_id__in=subscan.celery_ids)
 	failed_tasks = tasks.filter(status=FAILED_TASK)
@@ -4776,7 +4776,7 @@ def send_scan_notif(
 	engine = EngineType.objects.filter(pk=engine_id).first()
 	scan = ScanHistory.objects.filter(pk=scan_history_id).first()
 	subscan = SubScan.objects.filter(pk=subscan_id).first()
-	tasks = ScanActivity.objects.filter(scan_of=scan) if scan else 0
+	tasks = ScanActivity.objects.filter(scan_history=scan) if scan else 0
 
 	# Build notif options
 	url = get_scan_url(scan_history_id, subscan_id)
@@ -6105,9 +6105,9 @@ def save_metadata_info(meta_dict):
 
 def create_scan_activity(scan_history_id, message, status):
 	scan_activity = ScanActivity()
-	scan_activity.scan_of = ScanHistory.objects.get(pk=scan_history_id)
+	scan_activity.scan_history = ScanHistory.objects.get(pk=scan_history_id)
 	scan_activity.title = message
-	scan_activity.time = timezone.now()
+	scan_activity.created_at = timezone.now()
 	scan_activity.status = status
 	scan_activity.save()
 	return scan_activity.id

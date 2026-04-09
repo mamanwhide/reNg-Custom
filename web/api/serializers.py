@@ -82,7 +82,7 @@ class DomainSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Domain
 		fields = '__all__'
-		depth = 2
+		depth = 1
 
 	def get_vuln_count(self, obj):
 		try:

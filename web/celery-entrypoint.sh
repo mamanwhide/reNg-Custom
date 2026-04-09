@@ -83,7 +83,10 @@ else
 fi
 
 # Temporary fix for whatportis bug - See https://github.com/yogeshojha/rengine/issues/984
-sed -i 's/purge()/truncate()/g' /usr/local/lib/python3.10/dist-packages/whatportis/cli.py || true
+WHATPORTIS_CLI=$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)" 2>/dev/null) || true
+if [ -n "$WHATPORTIS_CLI" ]; then
+  sed -i 's/purge()/truncate()/g' "$WHATPORTIS_CLI" || true
+fi
 
 # update whatportis
 yes | whatportis --update || true

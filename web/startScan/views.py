@@ -19,7 +19,7 @@ from reNgine.celery import app
 from reNgine.charts import *
 from reNgine.common_func import *
 from reNgine.definitions import ABORTED_TASK, SUCCESS_TASK
-from reNgine.security import is_safe_path
+from reNgine.security import is_safe_path, sanitize_filename
 from reNgine.tasks import create_scan_activity, initiate_scan, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
@@ -66,7 +66,7 @@ def detail_scan(request, id, slug):
     vulns_tags = VulnerabilityTags.objects.filter(vuln_tags__in=vulns)
     ip_addresses = IpAddress.objects.filter(ip_addresses__in=subdomains)
     geo_isos = CountryISO.objects.filter(ipaddress__in=ip_addresses)
-    scan_activity = ScanActivity.objects.filter(scan_of__id=id).order_by('time')
+    scan_activity = ScanActivity.objects.filter(scan_history__id=id).order_by('created_at')
     cves = CveId.objects.filter(cve_ids__in=vulns)
     cwes = CweId.objects.filter(cwe_ids__in=vulns)
 
@@ -461,10 +461,10 @@ def export_subdomains(request, scan_id):
     for domain in subdomain_list:
         response_body += domain.name + "\n"
     scan_start_date_str = str(scan.start_scan_date.date())
-    domain_name = scan.domain.name
+    safe_name = sanitize_filename(scan.domain.name)
     response = HttpResponse(response_body, content_type='text/plain')
     response['Content-Disposition'] = (
-        f'attachment; filename="subdomains_{domain_name}_{scan_start_date_str}.txt"'
+        f'attachment; filename="subdomains_{safe_name}_{scan_start_date_str}.txt"'
     )
     return response
 
@@ -477,10 +477,10 @@ def export_endpoints(request, scan_id):
     for endpoint in endpoint_list:
         response_body += endpoint.http_url + "\n"
     scan_start_date_str = str(scan.start_scan_date.date())
-    domain_name = scan.domain.name
+    safe_name = sanitize_filename(scan.domain.name)
     response = HttpResponse(response_body, content_type='text/plain')
     response['Content-Disposition'] = (
-        f'attachment; filename="endpoints_{domain_name}_{scan_start_date_str}.txt"'
+        f'attachment; filename="endpoints_{safe_name}_{scan_start_date_str}.txt"'
     )
     return response
 
@@ -494,10 +494,10 @@ def export_urls(request, scan_id):
         if url.http_url:
             response_body += url.http_url + "\n"
     scan_start_date_str = str(scan.start_scan_date.date())
-    domain_name = scan.domain.name
+    safe_name = sanitize_filename(scan.domain.name)
     response = HttpResponse(response_body, content_type='text/plain')
     response['Content-Disposition'] = (
-        f'attachment; filename="urls_{domain_name}_{scan_start_date_str}.txt"'
+        f'attachment; filename="urls_{safe_name}_{scan_start_date_str}.txt"'
     )
     return response
 
@@ -546,14 +546,14 @@ def stop_scan(request, id):
             # 3. Also revoke & mark all RUNNING ScanActivity tasks
             tasks = (
                 ScanActivity.objects
-                .filter(scan_of=scan)
+                .filter(scan_history=scan)
                 .filter(status=RUNNING_TASK)
                 .order_by('-pk')
             )
             for task in tasks:
                 app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
                 task.status = ABORTED_TASK
-                task.time = timezone.now()
+                task.created_at = timezone.now()
                 task.save()
             create_scan_activity(scan.id, "Scan aborted", ABORTED_TASK)
             response = {'status': True}
@@ -590,14 +590,14 @@ def stop_scans(request, slug):
                     app.control.revoke(task_id, terminate=True, signal='SIGKILL')
                 tasks = (
                     ScanActivity.objects
-                    .filter(scan_of=scan)
+                    .filter(scan_history=scan)
                     .filter(status=RUNNING_TASK)
                     .order_by('-pk')
                 )
                 for task in tasks:
                     app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
                     task.status = ABORTED_TASK
-                    task.time = timezone.now()
+                    task.created_at = timezone.now()
                     task.save()
                 create_scan_activity(scan.id, "Scan aborted", ABORTED_TASK)
                 messages.add_message(

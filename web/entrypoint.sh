@@ -29,7 +29,8 @@ if command -v gosu &> /dev/null && id -u rengine &> /dev/null; then
         --error-logfile /var/log/gunicorn/error.log \
         --log-level info
 else
-    echo "[WARN] gosu or rengine user not found, running as current user"
+    echo "[WARN] gosu or rengine user not found, running as $(whoami) — this is insecure for production!"
+    echo "[WARN] Install gosu and create a rengine user to run as non-root"
     exec gunicorn reNgine.wsgi:application \
         --bind 0.0.0.0:8000 \
         --workers "${GUNICORN_WORKERS:-4}" \

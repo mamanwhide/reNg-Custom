@@ -207,7 +207,7 @@ class Subdomain(models.Model):
 	id = models.AutoField(primary_key=True)
 	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, null=True, blank=True)
 	target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE, null=True, blank=True)
-	name = models.CharField(max_length=1000)
+	name = models.CharField(max_length=1000, db_index=True)
 	is_imported_subdomain = models.BooleanField(default=False)
 	is_important = models.BooleanField(default=False, null=True, blank=True)
 	http_url = models.CharField(max_length=10000, null=True, blank=True)
@@ -382,7 +382,7 @@ class EndPoint(models.Model):
 		null=True,
 		blank=True)
 	source = models.CharField(max_length=200, null=True, blank=True)
-	http_url = models.CharField(max_length=30000)
+	http_url = models.CharField(max_length=30000, db_index=True)
 	content_length = models.IntegerField(default=0, null=True, blank=True)
 	page_title = models.CharField(max_length=30000, null=True, blank=True)
 	http_status = models.IntegerField(default=0, null=True, blank=True)
@@ -469,7 +469,7 @@ class Vulnerability(models.Model):
 	template_id = models.CharField(max_length=200, null=True, blank=True)
 	matcher_name = models.CharField(max_length=500, null=True, blank=True)
 	name = models.CharField(max_length=2500)
-	severity = models.IntegerField()
+	severity = models.IntegerField(db_index=True)
 	description = models.TextField(null=True, blank=True)
 	impact = models.TextField(null=True, blank=True)
 	remediation = models.TextField(null=True, blank=True)
@@ -487,7 +487,7 @@ class Vulnerability(models.Model):
 	cvss_score = models.FloatField(null=True, blank=True, default=None)
 	curl_command = models.CharField(max_length=15000, null=True, blank=True)
 	type = models.CharField(max_length=100, null=True, blank=True)
-	http_url = models.CharField(max_length=10000, null=True)
+	http_url = models.CharField(max_length=10000, null=True, db_index=True)
 	discovered_date = models.DateTimeField(null=True, default=timezone.now)
 	open_status = models.BooleanField(null=True, blank=True, default=True)
 	hackerone_report_id = models.CharField(max_length=50, null=True, blank=True)
@@ -523,10 +523,10 @@ class Vulnerability(models.Model):
 
 class ScanActivity(models.Model):
 	id = models.AutoField(primary_key=True)
-	scan_of = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, blank=True, null=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, blank=True, null=True, db_column='scan_of_id')
 	title = models.CharField(max_length=1000)
 	name = models.CharField(max_length=1000)
-	time = models.DateTimeField()
+	created_at = models.DateTimeField(db_column='time')
 	status = models.IntegerField()
 	error_message = models.CharField(max_length=300, blank=True, null=True)
 	traceback = models.TextField(blank=True, null=True)
@@ -543,7 +543,7 @@ class Command(models.Model):
 	command = models.TextField(blank=True, null=True)
 	return_code = models.IntegerField(blank=True, null=True)
 	output = models.TextField(blank=True, null=True)
-	time = models.DateTimeField()
+	created_at = models.DateTimeField(db_column='time')
 
 	def __str__(self):
 		return str(self.command)
@@ -656,7 +656,7 @@ class MetaFinderDocument(models.Model):
 
 class Email(models.Model):
 	id = models.AutoField(primary_key=True)
-	address = models.CharField(max_length=200, blank=True, null=True)
+	address = models.CharField(max_length=200, blank=True, null=True, db_index=True)
 	password = models.CharField(max_length=200, blank=True, null=True)
 
 	def __str__(self):

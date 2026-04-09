@@ -36,36 +36,28 @@ Scan Findings
 <div class="row">
 	<div class="col-12">
 		<div class="card">
-			<ul class="nav nav-tabs nav-bordered m-1">
+			<ul class="nav nav-tabs nav-bordered m-1 rn-scan-tabs">
+				{# ── Overview Group ── #}
+				<li class="rn-tab-group-label" aria-hidden="true"><span>Overview</span></li>
 				<li class="nav-item">
-					<a class="nav-link active" id="pills-summary-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#summary-tab">Home</a>
+					<a class="nav-link active" id="pills-summary-tab" data-bs-toggle="tab" aria-expanded="false" href="#summary-tab"><i class="fe-home me-1"></i>Home</a>
 				</li>
+				{% if total_vulnerability_count > 0 %}
 				<li class="nav-item">
-					<a class="nav-link" id="pills-subdomain-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#subdomain-tab">Subdomains</a>
-				</li>
-				{% if history.buckets.all %}
-				<li class="nav-item">
-					<a class="nav-link" id="pills-buckets-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#buckets-tab">S3 Buckets</a>
+					<a class="nav-link" id="pills-vulnerabilities-tab" data-bs-toggle="tab" aria-expanded="false" href="#vulnerabilities-tab"><i class="fe-alert-triangle me-1"></i>Vulnerabilities <span class="badge bg-danger ms-1">{{total_vulnerability_count}}</span></a>
 				</li>
 				{% endif %}
-				<li class="nav-item interesting-tab-show" style="display: none">
-					<a class="nav-link" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#interesting-tab">Interesting Recon</a>
-				</li>
-				<li class="nav-item recon-changes-tab-show" style="display: none">
-					<a class="nav-link" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#recon-changes-tab">Recon Data Changes</a>
-				</li>
-				{% if 'screenshot' in history.tasks or screenshot_count > 0 %}
 				<li class="nav-item">
-					<a class="nav-link" id="pills-screenshot-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#screenshot-tab">Screenshots {% if screenshot_count > 0 %}<span class="badge bg-secondary">{{screenshot_count}}</span>{% endif %}</a>
+					<a class="nav-link" id="pills-visualisation-tab" data-bs-toggle="tab" aria-expanded="false" href="#visualisation-tab"><i class="fe-globe me-1"></i>Visualization</a>
 				</li>
-				{% endif %}
-				{% if 'dir_file_fuzz' in history.tasks %}
+
+				{# ── Assets Group ── #}
+				<li class="rn-tab-group-label" aria-hidden="true"><span>Assets</span></li>
 				<li class="nav-item">
-					<a class="nav-link" id="pills-directories-tab" data-bs-toggle="tab" aria-expanded="false" href="#directories-tab">Directories</a>
+					<a class="nav-link" id="pills-subdomain-tab" data-bs-toggle="tab" aria-expanded="false" href="#subdomain-tab"><i class="fe-layers me-1"></i>Subdomains</a>
 				</li>
-				{% endif %}
 				<li class="nav-item dropdown">
-					<a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false">URLs&nbsp;<i class="fe-chevron-down"></i></a>
+					<a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" href="#" role="button" aria-expanded="false"><i class="fe-link me-1"></i>URLs&nbsp;<i class="fe-chevron-down"></i></a>
 					<ul class="dropdown-menu" style="width: 240px;">
 						<li><a class="dropdown-item" id="pills-endpoints-tab" href="#endpoints-tab" data-bs-toggle="tab" aria-expanded="false">All Endpoints</a></li>
 						{% if 'fetch_url' in history.tasks and history.used_gf_patterns %}
@@ -77,18 +69,34 @@ Scan Findings
 						{% endif %}
 					</ul>
 				</li>
-				{% if total_vulnerability_count > 0 %}
+				{% if 'screenshot' in history.tasks or screenshot_count > 0 %}
 				<li class="nav-item">
-					<a class="nav-link" id="pills-vulnerabilities-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#vulnerabilities-tab">Vulnerabilities</a>
+					<a class="nav-link" id="pills-screenshot-tab" data-bs-toggle="tab" aria-expanded="false" href="#screenshot-tab"><i class="fe-image me-1"></i>Screenshots {% if screenshot_count > 0 %}<span class="badge bg-secondary">{{screenshot_count}}</span>{% endif %}</a>
+				</li>
+				{% endif %}
+
+				{# ── Findings Group ── #}
+				<li class="rn-tab-group-label" aria-hidden="true"><span>Findings</span></li>
+				{% if history.buckets.all %}
+				<li class="nav-item">
+					<a class="nav-link" id="pills-buckets-tab" data-bs-toggle="tab" aria-expanded="false" href="#buckets-tab"><i class="fe-database me-1"></i>S3 Buckets</a>
+				</li>
+				{% endif %}
+				{% if 'dir_file_fuzz' in history.tasks %}
+				<li class="nav-item">
+					<a class="nav-link" id="pills-directories-tab" data-bs-toggle="tab" aria-expanded="false" href="#directories-tab"><i class="fe-folder me-1"></i>Directories</a>
 				</li>
 				{% endif %}
 				{% if 'osint' in history.tasks %}
 				<li class="nav-item">
-					<a class="nav-link" id="pills-osint-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#osint-tab">OSINT</a>
+					<a class="nav-link" id="pills-osint-tab" data-bs-toggle="tab" aria-expanded="false" href="#osint-tab"><i class="fe-search me-1"></i>OSINT</a>
 				</li>
 				{% endif %}
-				<li class="nav-item">
-					<a class="nav-link" id="pills-visualisation-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link" href="#visualisation-tab">Visualization</a>
+				<li class="nav-item interesting-tab-show" style="display: none">
+					<a class="nav-link" data-bs-toggle="tab" aria-expanded="false" href="#interesting-tab"><i class="fe-star me-1"></i>Interesting Recon</a>
+				</li>
+				<li class="nav-item recon-changes-tab-show" style="display: none">
+					<a class="nav-link" data-bs-toggle="tab" aria-expanded="false" href="#recon-changes-tab"><i class="fe-git-commit me-1"></i>Recon Data Changes</a>
 				</li>
 			</ul>
 		</div>
@@ -256,7 +264,7 @@ Scan Findings
 												{% endif %}
 											</span>
 										</h5>
-										<p class="text-muted">{{activity.time|naturaltime}}<br><small class="text-muted">{{activity.time}}</small> </p>
+										<p class="text-muted">{{activity.created_at|naturaltime}}<br><small class="text-muted">{{activity.created_at}}</small> </p>
 										{% if activity.status == 0 %}
 											{% if activity.error_message %}
 												<p class="badge badge-soft-danger">Error: {{activity.error_message}}</p>

@@ -40,7 +40,7 @@ DEFAULT_THREADS = env.int('DEFAULT_THREADS', default=30)
 DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
 
 # Globals
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=[DOMAIN_NAME, 'localhost', '127.0.0.1'])
 SECRET_KEY = first_run(SECRET_FILE, BASE_DIR)
 
 # Rengine version
@@ -348,7 +348,23 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10000
 '''
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': env('CELERY_BROKER', default='redis://redis:6379/0').rsplit('/', 1)[0] + '/1',
         'TIMEOUT': 60 * 30,  # 30 minutes caching will be used
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
     }
 }
+
+'''
+    Security Settings
+'''
+CSRF_TRUSTED_ORIGINS = env.list(
+    'CSRF_TRUSTED_ORIGINS',
+    default=[f'https://{DOMAIN_NAME}', f'http://{DOMAIN_NAME}']
+)
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True

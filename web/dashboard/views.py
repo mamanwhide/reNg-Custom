@@ -42,7 +42,7 @@ def index(request, slug):
     endpoints = EndPoint.objects.filter(scan_history__domain__project__slug=project)
     scan_histories = ScanHistory.objects.filter(domain__project=project)
     vulnerabilities = Vulnerability.objects.filter(scan_history__domain__project__slug=project)
-    scan_activities = ScanActivity.objects.filter(scan_of__in=scan_histories)
+    scan_activities = ScanActivity.objects.filter(scan_history__in=scan_histories)
 
     # LOW-03 fix: Cache expensive count queries with 60-second TTL
     cache_key = f'dashboard_stats_{slug}'
@@ -92,7 +92,7 @@ def index(request, slug):
     context['dashboard_data_active'] = 'active'
 
     vulnerability_feed = vulnerabilities.order_by('-discovered_date')[:50]
-    activity_feed = scan_activities.order_by('-time')[:50]
+    activity_feed = scan_activities.order_by('-created_at')[:50]
     last_week = timezone.now() - timedelta(days=7)
 
     count_targets_by_date = domains.filter(
