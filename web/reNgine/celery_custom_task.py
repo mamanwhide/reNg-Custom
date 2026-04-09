@@ -3,6 +3,7 @@ import json
 from celery import Task
 from celery.utils.log import get_task_logger
 from celery.worker.request import Request
+from django.db import IntegrityError
 from django.utils import timezone
 from redis import Redis
 from reNgine.common_func import (fmt_traceback, get_output_file_name,
@@ -197,6 +198,12 @@ class RengineTask(Task):
 		self.activity.save()
 		self.activity_id = self.activity.id
 		if self.scan:
+			try:
+				self.scan.refresh_from_db()
+			except ScanHistory.DoesNotExist:
+				logger.warning(f'ScanHistory {self.scan_id} was deleted, aborting task {self.task_name}')
+				self.track = False
+				return
 			self.activity.scan_history = self.scan
 			self.activity.save()
 			self.scan.celery_ids.append(celery_id)
@@ -221,7 +228,11 @@ class RengineTask(Task):
 		self.activity.error_message = error_message
 		self.activity.traceback = self.traceback
 		self.activity.created_at = timezone.now()
-		self.activity.save()
+		try:
+			self.activity.save()
+		except IntegrityError:
+			logger.warning(f'ScanHistory {self.scan_id} was deleted, skipping activity update for {self.task_name}')
+			return
 		self.notify()
 
 	def notify(self, name=None, severity=None, fields={}, add_meta_info=True):
