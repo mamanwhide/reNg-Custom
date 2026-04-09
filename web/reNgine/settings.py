@@ -67,6 +67,7 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
+        'CONN_MAX_AGE': env.int('CONN_MAX_AGE', default=600),
         # 'OPTIONS':{
         #     'sslmode':'verify-full',
         #     'sslrootcert': os.path.join(BASE_DIR, 'ca-certificate.crt')
@@ -183,11 +184,17 @@ STATICFILES_DIRS = [
 
 LOGIN_REQUIRED_IGNORE_VIEW_NAMES = [
     'login',
+    'logout',
 ]
 
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'onboarding'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Explicit authentication backend
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+]
 
 # Tool Location
 TOOL_LOCATION = '/usr/src/app/tools/'
@@ -291,17 +298,17 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['file'],
-            'level': 'ERROR' if DEBUG else 'CRITICAL',
+            'level': env('DJANGO_LOG_LEVEL', default='ERROR' if DEBUG else 'CRITICAL'),
             'propagate': True,
         },
         '': {
             'handlers': ['brief'],
-            'level': 'DEBUG' if DEBUG else 'INFO',
+            'level': env('LOG_LEVEL', default='DEBUG' if DEBUG else 'INFO'),
             'propagate': False
         },
         'celery': {
             'handlers': ['celery'],
-            'level': 'DEBUG' if DEBUG else 'ERROR',
+            'level': env('CELERY_LOG_LEVEL', default='DEBUG' if DEBUG else 'ERROR'),
         },
         'celery.app.trace': {
             'handlers': ['null'],

@@ -69,7 +69,6 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_HOST=${POSTGRES_HOST}
     depends_on:
-      - celery
       - db
     volumes:
       - ./web:/usr/src/app
@@ -167,6 +166,7 @@ services:
 
 networks:
   rengine_network:
+    driver: bridge
 
 volumes:
   tool_config:

@@ -103,23 +103,18 @@ RUN printf "\
     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
 
 
-# Update Nuclei and Nuclei-Templates
-RUN nuclei -update-templates
+# Update Nuclei and Nuclei-Templates, Chaos
+RUN nuclei -update-templates && chaos -update
 
-# update chaos
-RUN chaos -update
-
-# Copy requirements
+# Copy requirements and install Python dependencies
 COPY ./requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade setuptools==72.1.0
-RUN pip3 install -r /tmp/requirements.txt --no-cache-dir
-
-# install eyewitness
-RUN pip3 install --no-cache-dir fuzzywuzzy \
-    selenium==4.9.1 \
-    python-Levenshtein \
-    pyvirtualdisplay \
-    netaddr
+RUN pip3 install --upgrade setuptools==72.1.0 \
+    && pip3 install -r /tmp/requirements.txt --no-cache-dir \
+    && pip3 install --no-cache-dir fuzzywuzzy \
+       selenium==4.9.1 \
+       python-Levenshtein \
+       pyvirtualdisplay \
+       netaddr
 
 # Copy source code
 COPY . /usr/src/app/
@@ -129,3 +124,5 @@ RUN groupadd -r rengine && useradd -r -g rengine -d /home/rengine -m -s /bin/bas
     && chown -R rengine:rengine /usr/src/app \
     && mkdir -p /var/log/gunicorn \
     && chown -R rengine:rengine /var/log/gunicorn
+
+EXPOSE 8000
