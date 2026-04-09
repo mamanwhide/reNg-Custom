@@ -5768,7 +5768,7 @@ def run_command(
 	# Create a command record in the database
 	command_obj = Command.objects.create(
 		command=cmd,
-		time=timezone.now(),
+		created_at=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
 
@@ -5818,7 +5818,7 @@ def stream_command(cmd, cwd=None, shell=False, history_file=None, encoding='utf-
 	# Create a command record in the database
 	command_obj = Command.objects.create(
 		command=cmd,
-		time=timezone.now(),
+		created_at=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
 
