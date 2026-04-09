@@ -209,7 +209,7 @@ function cms_detector_api_call(url){
 
 			content += '</div>'
 
-			$('#modal-content').append(content);
+			$('#modal-content').append(DOMPurify.sanitize(content));
 			$('#modal_dialog').modal('show');
 		} else {
 			Swal.fire({

@@ -36,7 +36,7 @@ function visualise_scan_results(scan_id)
   || document.documentElement.clientHeight
   || document.body.clientHeight;
 
-  $.getJSON(`/api/queryAllScanResultVisualise/?scan_id=${scan_id}&format=json`, function(data) {
+  $.getJSON(`/api/queryAllScanResultVisualise/?scan_id=${encodeURIComponent(scan_id)}&format=json`, function(data) {
     $('#visualisation-loader').empty();
     $('#visualisation-filter').show();
     var treeData = data[0];

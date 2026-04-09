@@ -4,7 +4,7 @@ import colorsys
 import plotly.graph_objs as go
 from plotly.io import to_image
 from django.db.models import Count
-from reNgine.definitions import NUCLEI_SEVERITY_MAP
+from reNgine.definitions import NUCLEI_SEVERITY_MAP, NUCLEI_REVERSE_SEVERITY_MAP
 
 from startScan.models import *
 

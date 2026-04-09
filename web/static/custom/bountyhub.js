@@ -91,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             `;
             const cardNode = template.content.firstElementChild.cloneNode(true);
-            cardNode.querySelector('.card-body').innerHTML = generateCardContent(attributes);
+            cardNode.querySelector('.card-body').innerHTML = DOMPurify.sanitize(generateCardContent(attributes));
             fragment.appendChild(cardNode);
         });
 

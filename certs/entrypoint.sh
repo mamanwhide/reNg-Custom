@@ -7,10 +7,10 @@ cert() {
   echo "Creating new certificate for ${COMMON_NAME}"
   
   # Generate a new RSA key pair if does not exist
-  if ! test -f ${CERT}_rsa.key; then
+  if ! test -f ${FILENAME}_rsa.key; then
     openssl genrsa -out ${FILENAME}.key 4096
   else
-    mv ${CERT}_rsa.key ${FILENAME}.key
+    mv ${FILENAME}_rsa.key ${FILENAME}.key
   fi
 
   # Request a new certificate for the generated key pair

@@ -224,7 +224,7 @@ class Subdomain(models.Model):
 	content_length = models.IntegerField(default=0, blank=True, null=True)
 	page_title = models.CharField(max_length=1000, blank=True, null=True)
 	technologies = models.ManyToManyField('Technology', related_name='technologies', blank=True)
-	ip_addresses = models.ManyToManyField('IPAddress', related_name='ip_addresses', blank=True)
+	ip_addresses = models.ManyToManyField('IpAddress', related_name='ip_addresses', blank=True)
 	directories = models.ManyToManyField('DirectoryScan', related_name='directories', blank=True)
 	waf = models.ManyToManyField('Waf', related_name='waf', blank=True)
 	attack_surface = models.TextField(null=True, blank=True)
