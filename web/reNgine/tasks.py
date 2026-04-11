@@ -3262,8 +3262,9 @@ def fetch_url(self, urls=None, ctx=None, description=None):
 		cmd_map['katana'] += formatted_headers
 	cat_input = f'cat {input_path}'
 	grep_output = f'grep -Eo {host_regex}'
+	max_urls_per_tool = 50000
 	cmd_map = {
-		tool: f'{cat_input} | {cmd} | {grep_output} > {self.results_dir}/urls_{tool}.txt'
+		tool: f'{cat_input} | {cmd} | {grep_output} | head -n {max_urls_per_tool} > {self.results_dir}/urls_{tool}.txt'
 		for tool, cmd in cmd_map.items()
 	}
 	tasks = group(
@@ -3308,15 +3309,19 @@ def fetch_url(self, urls=None, ctx=None, description=None):
 		return None
 
 	# Store all the endpoints and run httpx
+	MAX_URLS = 200000
 	with open(self.output_path) as f:
-		discovered_urls = f.readlines()
+		discovered_urls = f.readlines()[:MAX_URLS]
 		self.notify(fields={'Discovered URLs': len(discovered_urls)})
 
 	# Some tools can have an URL in the format <URL>] - <PATH> or <URL> - <PATH>, add them
 	# to the final URL list
+	seen_urls = set()
 	all_urls = []
 	for url in discovered_urls:
 		url = url.strip()
+		if not url:
+			continue
 		urlpath = None
 		base_url = None
 		if '] ' in url: # found JS scraped endpoint e.g from gospider
@@ -3335,8 +3340,10 @@ def fetch_url(self, urls=None, ctx=None, description=None):
 
 		if not validators.url(url):
 			logger.warning(f'Invalid URL "{url}". Skipping.')
+			continue
 
-		if url not in all_urls:
+		if url not in seen_urls:
+			seen_urls.add(url)
 			all_urls.append(url)
 
 	# Filter out URLs if a path filter was passed
