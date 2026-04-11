@@ -374,4 +374,7 @@ CSRF_TRUSTED_ORIGINS = env.list(
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = not DEBUG
-CSRF_COOKIE_HTTPONLY = True
+# CSRF_COOKIE_HTTPONLY must be False so that JavaScript (getCookie('csrftoken'))
+# can read the token and include it in the X-CSRFToken header for AJAX requests.
+# Setting it to True blocks all JS-based POST/PUT/DELETE from the browser (403).
+CSRF_COOKIE_HTTPONLY = False
