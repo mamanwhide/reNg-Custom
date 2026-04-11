@@ -408,6 +408,14 @@ def report(ctx=None, description=None):
 	tasks = ScanActivity.objects.filter(scan_history=scan).all()
 	if subscan:
 		tasks = tasks.filter(celery_id__in=subscan.celery_ids)
+
+	# Mark any still-RUNNING tasks as FAILED — if report() is executing,
+	# any task still in RUNNING state has crashed (worker killed, OOM, etc.)
+	stuck_tasks = tasks.filter(status=RUNNING_TASK)
+	if stuck_tasks.exists():
+		logger.warning(f'report(): marking {stuck_tasks.count()} stuck RUNNING tasks as FAILED')
+		stuck_tasks.update(status=FAILED_TASK)
+
 	failed_tasks = tasks.filter(status=FAILED_TASK)
 
 	# Get task status
