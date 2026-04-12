@@ -213,6 +213,9 @@ CELERY_IGNORE_RESULTS = False
 CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
 CELERY_TRACK_STARTED = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Silence Celery 5.4 deprecation warning for chord error callbacks.
+# Setting True means error callbacks fire on chord header errors (new default).
+CELERY_TASK_ALLOW_ERROR_CB_ON_CHORD_HEADER = True
 # Fix: gevent + Redis backend causes BlockingSwitchOutError during AsyncResult
 # garbage collection (__del__ calls unsubscribe which triggers blocking DNS).
 # socket_timeout prevents the connection attempt from hanging inside gevent.
