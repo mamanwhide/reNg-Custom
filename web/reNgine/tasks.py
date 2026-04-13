@@ -206,11 +206,12 @@ def initiate_scan(
 
 
 		# Build Celery tasks, crafted according to the dependency graph below:
-		# subdomain_discovery --> port_scan --> fetch_url --> dir_file_fuzz
-		# osint								             	  vulnerability_scan
-		# osint								             	  dalfox xss scan
-		#						 	   		         	  	  screenshot
-		#													  waf_detection
+		# subdomain_discovery --> port_scan --> fetch_url --> dir_file_fuzz --> vulnerability_scan
+		# osint								             	                   screenshot
+		#						 	   		         	  	                   waf_detection
+		#
+		# dir_file_fuzz runs BEFORE vuln scan so that ffuf-discovered
+		# endpoints are already in the DB when nuclei reads them.
 		workflow = chain(
 			group(
 				subdomain_discovery.si(ctx=ctx, description='Subdomain discovery'),
@@ -218,8 +219,8 @@ def initiate_scan(
 			),
 			port_scan.si(ctx=ctx, description='Port scan'),
 			fetch_url.si(ctx=ctx, description='Fetch URL'),
+			dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
 			group(
-				dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
 				vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'),
 				screenshot.si(ctx=ctx, description='Screenshot'),
 				waf_detection.si(ctx=ctx, description='WAF detection')
