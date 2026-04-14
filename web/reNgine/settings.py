@@ -67,7 +67,10 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
-        'CONN_MAX_AGE': env.int('CONN_MAX_AGE', default=600),
+        # CONN_MAX_AGE=0 closes DB connections after each request.
+        # Required because gevent workers share greenlets that don't
+        # release persistent connections, exhausting PostgreSQL's pool.
+        'CONN_MAX_AGE': env.int('CONN_MAX_AGE', default=0),
         # 'OPTIONS':{
         #     'sslmode':'verify-full',
         #     'sslrootcert': os.path.join(BASE_DIR, 'ca-certificate.crt')
