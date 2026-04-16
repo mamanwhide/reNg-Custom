@@ -858,7 +858,11 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 				'scan_id': scan_history_id,
 				'documents_limit': documents_limit
 			})
-			meta_info.append(save_metadata_info(meta_dict))
+			try:
+				meta_info.append(save_metadata_info(meta_dict))
+			except Exception as e:
+				logger.error(f'save_metadata_info failed for {host}: {e}')
+				logger.warning('Continuing OSINT discovery — theHarvester/h8mail will still run.')
 
 		# TODO: disabled for now
 		# elif osint_intensity == 'deep':
