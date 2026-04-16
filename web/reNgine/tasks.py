@@ -3510,8 +3510,16 @@ def vulnerability_scan(self, urls=None, ctx=None, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
+	# Run vulnerability tools SEQUENTIALLY (chain) instead of in parallel (group)
+	# to prevent OOM on low-memory systems (e.g. 8GB laptops).
+	# Each tool (nuclei, dalfox, crlfuzz, s3scanner) is heavy — running them
+	# simultaneously causes 2-4x memory spike that kills the scan.
+	if not grouped_tasks:
+		logger.info('No vulnerability scan tools enabled, skipping.')
+		return None
+
+	celery_chain = chain(*grouped_tasks)
+	job = celery_chain.apply_async()
 
 	# MED-06 fix: Use allow_join_result() to permit job.get() inside a task.
 	# Without this, Celery raises "Never call result.get() within a task!"
@@ -3519,7 +3527,7 @@ def vulnerability_scan(self, urls=None, ctx=None, description=None):
 	# (nuclei, dalfox, etc.) are still running, marking the scan as complete.
 	try:
 		with allow_join_result():
-			job.get(timeout=7200, interval=5)
+			job.get(timeout=14400, interval=5)
 	except ChordError as e:
 		logger.warning(f'Vulnerability scan: chord aborted (scan likely stopped): {e}')
 	except Exception as e:
@@ -3983,8 +3991,16 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
+	# Run severities SEQUENTIALLY (chain) instead of in parallel (group)
+	# to prevent OOM: each nuclei process loads ~10,000+ templates into memory.
+	# Running 6 severity processes simultaneously = 6x memory usage (~3-6 GB).
+	# Sequential execution scans all severities with 1/6 the memory footprint.
+	if not grouped_tasks:
+		logger.info('No nuclei severities configured, skipping.')
+		return None
+
+	celery_chain = chain(*grouped_tasks)
+	job = celery_chain.apply_async()
 
 	# allow_join_result() is required here because nuclei_scan is itself a
 	# Celery task and calling job.get() inside a task raises
@@ -3993,7 +4009,7 @@ def nuclei_scan(self, urls=None, ctx=None, description=None):
 	# child tasks — each task that calls .get() must have its own guard.)
 	try:
 		with allow_join_result():
-			job.get(timeout=7200, interval=5)
+			job.get(timeout=14400, interval=5)
 	except ChordError as e:
 		logger.warning(f'nuclei_scan: chord aborted (scan likely stopped): {e}')
 	except Exception as e:

@@ -11,7 +11,7 @@
 subdomain_discovery: {
   'uses_tools': ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],  # amass-passive, amass-active, All
   'enable_http_crawl': true,
-  'threads': 30,
+  'threads': 15,
   'timeout': 5,
   # 'use_subfinder_config': false,
   # 'use_amass_config': false,
@@ -27,8 +27,8 @@ port_scan: {
   # 'exclude_ports': [],
   # 'exclude_subdomains': [],
   'ports': ['top-100'],
-  'rate_limit': 150,
-  'threads': 30,
+  'rate_limit': 100,
+  'threads': 15,
   'passive': false,
   # 'use_naabu_config': false,
   # 'enable_nmap': true,
@@ -65,15 +65,15 @@ osint: {
 dir_file_fuzz: {
   'auto_calibration': true,
   'enable_http_crawl': true,
-  'rate_limit': 150,
-  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],
+  'rate_limit': 100,
+  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','sql','json','yml','pdf'],
   'follow_redirect': false,
   'max_time': 0,
-  'match_http_status': [200, 204],
-  'recursive_level': 2,
+  'match_http_status': [200, 204, 301, 302, 307, 308, 401, 403, 405],
+  'recursive_level': 1,
   'stop_on_error': false,
   'timeout': 5,
-  'threads': 30,
+  'threads': 10,
   'wordlist_name': 'dicc'
 }
 fetch_url: {
@@ -83,7 +83,7 @@ fetch_url: {
   'enable_http_crawl': true,
   'gf_patterns': ['debug_logic', 'idor', 'interestingEXT', 'interestingparams', 'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],
   'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],
-  'threads': 30,
+  'threads': 10,
   # 'exclude_subdomains': false
 }
 vulnerability_scan: {
@@ -92,9 +92,9 @@ vulnerability_scan: {
   'run_crlfuzz': false,
   'run_s3scanner': false,
   'enable_http_crawl': true,
-  'concurrency': 50,
+  'concurrency': 25,
   'intensity': 'normal',
-  'rate_limit': 150,
+  'rate_limit': 100,
   'retries': 1,
   'timeout': 5,
   'fetch_gpt_report': true,
@@ -113,5 +113,5 @@ screenshot: {
   'enable_http_crawl': true,
   'intensity': 'normal',
   'timeout': 10,
-  'threads': 40
+  'threads': 10
 }

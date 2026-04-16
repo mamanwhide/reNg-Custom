@@ -29,6 +29,8 @@ services:
     restart: always
     entrypoint: /usr/src/app/celery-entrypoint.sh
     # command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
+    mem_limit: 4g
+    memswap_limit: 5g
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
