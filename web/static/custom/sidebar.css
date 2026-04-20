@@ -452,7 +452,10 @@ body.rn-sidebar-layout.sidebar-collapsed .rn-header {
 .rn-header__right {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: flex-end;
+  gap: 8px;
+  height: 100%;
+  padding-right: 8px;
 }
 
 /* Header nav links (replaces .navbar-custom .topnav-menu .nav-link) */
@@ -461,8 +464,17 @@ body.rn-sidebar-layout.sidebar-collapsed .rn-header {
   color: var(--rn-text-secondary, #6c757d);
   display: flex;
   align-items: center;
-  line-height: var(--header-height);
-  max-height: var(--header-height);
+  justify-content: center;
+  height: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.rn-header .nav-link:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: var(--rn-text-primary, #323a46);
 }
 
 .rn-header .dropdown .nav-link.show {
@@ -513,9 +525,12 @@ body.rn-sidebar-layout.sidebar-collapsed .rn-header {
 
 /* Notification icon styles */
 .rn-header .noti-icon {
-  font-size: 21px;
+  font-size: 24px;
   vertical-align: middle;
   color: var(--rn-text-secondary, #6c757d);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* User profile link */
