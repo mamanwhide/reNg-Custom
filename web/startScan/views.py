@@ -15,12 +15,12 @@ from django_celery_beat.models import (ClockedSchedule, IntervalSchedule, Period
 from rolepermissions.decorators import has_permission_decorator
 
 
-from reNgine.celery import app
-from reNgine.charts import *
-from reNgine.common_func import *
-from reNgine.definitions import ABORTED_TASK, SUCCESS_TASK
-from reNgine.security import is_safe_path, sanitize_filename
-from reNgine.tasks import create_scan_activity, initiate_scan, run_command
+from paraKang.celery import app
+from paraKang.charts import *
+from paraKang.common_func import *
+from paraKang.definitions import ABORTED_TASK, SUCCESS_TASK
+from paraKang.security import is_safe_path, sanitize_filename
+from paraKang.tasks import create_scan_activity, initiate_scan, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
 from targetApp.models import *
@@ -508,7 +508,7 @@ def delete_scan(request, id):
     if request.method == "POST":
         # CRT-02 fix: Use safe path validation + shutil instead of shell rm -rf
         delete_dir = obj.results_dir
-        if delete_dir and is_safe_path(RENGINE_RESULTS, delete_dir):
+        if delete_dir and is_safe_path(PARAKANG_RESULTS, delete_dir):
             if os.path.isdir(delete_dir):
                 shutil.rmtree(delete_dir, ignore_errors=True)
         obj.delete()
@@ -809,10 +809,10 @@ def delete_all_screenshots(request):
     if request.method != 'POST':
         return JsonResponse({'status': 'false', 'error': 'Method not allowed'}, status=405)
     # LOW-07 fix: Use safe directory cleanup instead of shell rm -rf
-    if os.path.isdir(RENGINE_RESULTS):
-        for item in os.listdir(RENGINE_RESULTS):
-            item_path = os.path.join(RENGINE_RESULTS, item)
-            if is_safe_path(RENGINE_RESULTS, item_path):
+    if os.path.isdir(PARAKANG_RESULTS):
+        for item in os.listdir(PARAKANG_RESULTS):
+            item_path = os.path.join(PARAKANG_RESULTS, item)
+            if is_safe_path(PARAKANG_RESULTS, item_path):
                 if os.path.isdir(item_path):
                     shutil.rmtree(item_path, ignore_errors=True)
                 else:
@@ -1024,7 +1024,7 @@ def delete_scans(request, slug):
             scan = get_object_or_404(ScanHistory, id=value)
             # CRT-02 fix: Use safe path validation + shutil instead of shell rm -rf
             delete_dir = scan.results_dir
-            if delete_dir and is_safe_path(RENGINE_RESULTS, delete_dir):
+            if delete_dir and is_safe_path(PARAKANG_RESULTS, delete_dir):
                 if os.path.isdir(delete_dir):
                     shutil.rmtree(delete_dir, ignore_errors=True)
             scan.delete()
@@ -1159,7 +1159,7 @@ def create_report(request, id):
         data['company_address'] = report.company_address
         data['company_email'] = report.company_email
         data['company_website'] = report.company_website
-        data['show_rengine_banner'] = report.show_rengine_banner
+        data['show_parakang_banner'] = report.show_parakang_banner
         data['show_footer'] = report.show_footer
         data['footer_text'] = report.footer_text
         data['show_executive_summary'] = report.show_executive_summary

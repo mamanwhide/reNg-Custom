@@ -27,7 +27,7 @@ PIP_NETWORK_FLAGS="--retries 1 --timeout 15"
 echo "Waiting for database migrations to be applied by web container..."
 until python3 -c "
 import django, sys, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'paraKang.settings')
 django.setup()
 from django.db import connection
 cursor = connection.cursor()
@@ -82,7 +82,7 @@ else
   echo "Skipping Firefox install (no network)"
 fi
 
-# Temporary fix for whatportis bug - See https://github.com/yogeshojha/rengine/issues/984
+# Temporary fix for whatportis bug - See https://github.com/yogeshojha/parakang/issues/984
 WHATPORTIS_CLI=$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)" 2>/dev/null) || true
 if [ -n "$WHATPORTIS_CLI" ]; then
   sed -i 's/purge()/truncate()/g' "$WHATPORTIS_CLI" || true
@@ -161,7 +161,7 @@ if [ "$NETWORK_AVAILABLE" = true ]; then
     timeout 60 git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan || true
     echo "Symlinking to nmap script dir"
     ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan || true
-    echo "Usage in reNgine, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
+    echo "Usage in paraKang, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
   fi
 
   # install h8mail
@@ -276,22 +276,22 @@ start_consolidated_worker() {
     local worker_name=$3
 
     if [ "$DEBUG" == "1" ]; then
-        watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/reNgine/" -- \
-            celery -A reNgine.tasks worker --pool=gevent --optimization=fair \
+        watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/paraKang/" -- \
+            celery -A paraKang.tasks worker --pool=gevent --optimization=fair \
             --autoscale=$concurrency,1 --loglevel=$loglevel -Q "$queues" -n "$worker_name" &
     else
-        celery -A reNgine.tasks worker --pool=gevent --optimization=fair \
+        celery -A paraKang.tasks worker --pool=gevent --optimization=fair \
             --autoscale=$concurrency,1 --loglevel=$loglevel -Q "$queues" -n "$worker_name" &
     fi
 }
 
 # 1. Main scan worker (prefork) — nuclei, nmap, httpx, dalfox, etc.
 if [ "$DEBUG" == "1" ]; then
-    watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/reNgine/" -- \
-        celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair \
+    watchmedo auto-restart --recursive --pattern="*.py" --directory="/usr/src/app/paraKang/" -- \
+        celery -A paraKang.tasks worker --loglevel=$loglevel --optimization=fair \
         --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &
 else
-    celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair \
+    celery -A paraKang.tasks worker --loglevel=$loglevel --optimization=fair \
         --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &
 fi
 

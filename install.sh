@@ -11,7 +11,7 @@ usageFunction()
 }
 
 tput setaf 2;
-cat web/art/reNgine.txt
+cat web/art/paraKang.txt
 
 tput setaf 1; echo "Before running this script, please make sure Docker is running and you have made changes to .env file."
 tput setaf 2; echo "Changing the postgres username & password from .env is highly recommended."
@@ -45,17 +45,17 @@ echo " "
 tput setaf 3;
 echo "#########################################################################"
 echo "Please note that, this installation script is only intended for Linux"
-echo "For Mac and Windows, refer to the official guide https://rengine.wiki"
+echo "For Mac and Windows, refer to the official guide https://parakang.wiki"
 echo "#########################################################################"
 
 echo " "
 tput setaf 4;
-echo "Installing reNgine and its dependencies"
+echo "Installing paraKang and its dependencies"
 
 echo " "
 if [ "$EUID" -ne 0 ]
   then
-  tput setaf 1; echo "Error installing reNgine, Please run this script as root!"
+  tput setaf 1; echo "Error installing paraKang, Please run this script as root!"
   tput setaf 1; echo "Example: sudo ./install.sh"
   exit
 fi
@@ -133,9 +133,9 @@ fi
 echo " "
 tput setaf 4;
 echo "#########################################################################"
-echo "Installing reNgine"
+echo "Installing paraKang"
 echo "#########################################################################"
-make certs && make build && make up && tput setaf 2 && echo "reNgine is installed!!!" && failed=0 || failed=1
+make certs && make build && make up && tput setaf 2 && echo "paraKang is installed!!!" && failed=0 || failed=1
 
 if [ "${failed}" -eq 0 ]; then
   echo " "
@@ -159,8 +159,8 @@ if [ "${failed}" -eq 0 ]; then
   echo "#########################################################################"
   make username isNonInteractive=$isNonInteractive
 
-  tput setaf 2 && printf "\n%s\n" "Thank you for installing reNgine, happy recon!!"
+  tput setaf 2 && printf "\n%s\n" "Thank you for installing paraKang, happy recon!!"
   echo "In case you have unapplied migrations (see above in red), run 'make migrate'"
 else
-  tput setaf 1 && printf "\n%s\n" "reNgine installation failed!!"
+  tput setaf 1 && printf "\n%s\n" "paraKang installation failed!!"
 fi

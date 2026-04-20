@@ -23,31 +23,30 @@ Add or Import Targets
   <div class="col-xl-12">
     <div class="card">
       <div class="card-body">
-        <ul class="nav nav-tabs nav-bordered">
-          <!-- <li class="nav-item">
-            <a href="#pills-add" data-bs-toggle="tab" aria-expanded="false" class="nav-link active">
-              Add Target
-            </a>
-          </li> -->
+        {# Quick method chooser #}
+        <p class="text-muted mb-3" style="font-size:var(--text-sm, 0.875rem);">
+          <i class="fe-info me-1"></i> Choose how you'd like to add targets to this project.
+        </p>
+        <ul class="nav nav-tabs nav-bordered rn-target-add-tabs">
           <li class="nav-item">
             <a href="#add-multiple-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link active">
-              Add Targets
+              <i class="fe-edit-3 me-1"></i> Add Targets
             </a>
           </li>
           <li class="nav-item">
             <a href="#ip-address-tab" data-bs-toggle="tab" aria-expanded="true" class="nav-link">
-              Resolve and add IP Address
+              <i class="fe-globe me-1"></i> Resolve IP Address
             </a>
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle arrow-none" href="#" id="import-dropdown" role="button"
             data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-            Import
+            <i class="fe-upload me-1"></i> Import
             <div class="arrow-down"></div>
           </a>
           <div class="dropdown-menu" aria-labelledby="import-dropdown">
-            <a class="dropdown-item" href="#import-text-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link">Import from Text File</a>
-            <a class="dropdown-item" href="#import-csv-tab" data-bs-toggle="tab" aria-expanded="false" class="nav-link">Import from CSV</a>
+            <a class="dropdown-item" href="#import-text-tab" data-bs-toggle="tab" aria-expanded="false"><i class="fe-file-text me-1"></i> Import from Text File</a>
+            <a class="dropdown-item" href="#import-csv-tab" data-bs-toggle="tab" aria-expanded="false"><i class="fe-file me-1"></i> Import from CSV</a>
           </div>
         </li>
       </ul>
@@ -58,7 +57,7 @@ Add or Import Targets
             <div class="row">
               <div class="col-12">
                 <div class="alert alert-primary border-0 mb-4" role="alert">
-                  Please enter your Target IP address, reNgine will look for the <b>A</b> records and resolve them to the domains.
+                  Please enter your Target IP address, paraKang will look for the <b>A</b> records and resolve them to the domains.
                 </div>
                 <label for="ip_address" class="text-dark">IP Address or CIDR</br><span class="text-muted">Example: 192.168.1.1 or 192.168.1.1/24, both are supported</span></label>
                 <input type="text" name="ip_address" class="form-control form-control-lg" id="ip_address" placeholder="X.X.X.X">

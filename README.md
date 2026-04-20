@@ -14,7 +14,7 @@
 
 ## TL;DR
 
-reNgine-Custom adalah platform otomasi reconnaissance web aplikasi berbasis Docker. Pengguna mendefinisikan target domain, memilih scan engine (sekumpulan konfigurasi YAML), lalu sistem menjalankan seluruh tahapan recon secara otomatis mulai dari enumerasi subdomain hingga pemindaian kerentanan, OSINT, dan analisis sertifikat TLS, semuanya disimpan ke database PostgreSQL dan dapat difilter via antarmuka web.
+paraKang adalah platform otomasi reconnaissance web aplikasi berbasis Docker. Pengguna mendefinisikan target domain, memilih scan engine (sekumpulan konfigurasi YAML), lalu sistem menjalankan seluruh tahapan recon secara otomatis mulai dari enumerasi subdomain hingga pemindaian kerentanan, OSINT, dan analisis sertifikat TLS, semuanya disimpan ke database PostgreSQL dan dapat difilter via antarmuka web.
 
 Fork ini menambahkan:
 - 27 perbaikan keamanan (dari audit mendalam terhadap 20 file sumber)
@@ -110,7 +110,7 @@ Alur kerja scan:
    - **Subdomain Scan**: hanya enumerasi subdomain
    - **Vulnerability Scan**: subdomain + port scan + nuclei
    - **Port Scan**: hanya port scan
-   - **reNgine Recommended**: set default yang seimbang
+   - **paraKang Recommended**: set default yang seimbang
 5. Klik "Initiate Scan"
 
 ### Konfigurasi Scan Engine (YAML)
@@ -144,9 +144,9 @@ Untuk scan ulang domain atau subdomain tertentu tanpa menjalankan full scan:
 Notifikasi aktif untuk:
 - Subdomain baru ditemukan
 - Kerentanan baru ditemukan
-- Commit baru di repository ini (via endpoint `/api/rengine/update/`)
+- Commit baru di repository ini (via endpoint `/api/parakang/update/`)
 
-Notifikasi dari GitHub upstream reNgine (yogeshojha/rengine) telah dinonaktifkan.
+Notifikasi dari GitHub upstream paraKang (yogeshojha/parakang) telah dinonaktifkan.
 
 ### Melihat Hasil HUMINT / SIGINT
 
@@ -166,7 +166,7 @@ Hasil HUMINT dan SIGINT tersedia via REST API:
 
 ## Proxy: Sumber dan Cara Kerja
 
-reNgine-Custom menggunakan proxy untuk melindungi IP asli selama scanning (terutama subdomain discovery, nuclei, fetch URL, dan dorking Google). Sistem proxy bersifat otomatis — tidak perlu konfigurasi manual jika menggunakan proxy gratis.
+paraKang-Custom menggunakan proxy untuk melindungi IP asli selama scanning (terutama subdomain discovery, nuclei, fetch URL, dan dorking Google). Sistem proxy bersifat otomatis — tidak perlu konfigurasi manual jika menggunakan proxy gratis.
 
 ### Sumber Proxy
 
@@ -184,7 +184,7 @@ Semua proxy tersimpan di `Settings → Proxy` (field `proxies`) dalam format `IP
 ### Alur Kerja Otomatis (Celery Beat)
 
 ```
-Worker startup (rengine-celery-1)
+Worker startup (parakang-celery-1)
     │
     ▼
 worker_ready signal (celery.py)
@@ -196,7 +196,7 @@ Daftarkan PeriodicTask ke DB:
   jadwal: setiap 7 hari
     │
     ▼
-rengine-celery-beat-1 (DatabaseScheduler)
+parakang-celery-beat-1 (DatabaseScheduler)
   polling DB tiap ~5 detik
     │
     ▼  [setiap 7 hari]
@@ -259,18 +259,18 @@ Saat memulai scan, pengguna dapat memilih mode proxy di wizard **"Proxy Setup"**
 
 ```bash
 # Trigger fetch proxy sekarang (tanpa menunggu 7 hari)
-docker exec rengine-celery-1 python -c \
-  "from reNgine.tasks import fetch_free_proxies; r=fetch_free_proxies(); print(r)"
+docker exec parakang-celery-1 python -c \
+  "from paraKang.tasks import fetch_free_proxies; r=fetch_free_proxies(); print(r)"
 
 # Cek jadwal di DB
-docker exec rengine-web-1 python manage.py shell -c "
+docker exec parakang-web-1 python manage.py shell -c "
 from django_celery_beat.models import PeriodicTask
 t = PeriodicTask.objects.get(name='Weekly proxy refresh & prune')
 print('Interval:', t.interval, '| Enabled:', t.enabled, '| Last run:', t.last_run_at)
 "
 
 # Verifikasi proxy aktif saat scan berjalan
-docker logs rengine-celery-1 --since=15m 2>&1 | grep -i "Using proxy\|no working proxy"
+docker logs parakang-celery-1 --since=15m 2>&1 | grep -i "Using proxy\|no working proxy"
 ```
 
 ---
@@ -314,14 +314,14 @@ nuclei -j -irr -l urls_unfurled.txt -c 50 -proxy http://1.2.3.4:8080
 **Verifikasi DAST aktif:**
 ```bash
 # Cek log saat scan berjalan
-docker logs rengine-celery-1 --since=15m 2>&1 | grep -i "dast"
+docker logs parakang-celery-1 --since=15m 2>&1 | grep -i "dast"
 # Output yang diharapkan:
 # nuclei_scan: added DAST templates dir /root/nuclei-templates/dast/ai (N files)
 # nuclei_scan: added DAST templates dir /root/nuclei-templates/dast/cves (N files)
 # nuclei_scan: added DAST templates dir /root/nuclei-templates/dast/vulnerabilities (N files)
 
 # Verifikasi command nuclei aktual pasca scan
-docker exec rengine-web-1 grep -a "^nuclei " \
+docker exec parakang-web-1 grep -a "^nuclei " \
   /usr/src/scan_results/*/commands.txt 2>/dev/null | grep dast | head -3
 ```
 
@@ -329,14 +329,14 @@ docker exec rengine-web-1 grep -a "^nuclei " \
 
 ```bash
 # Update template nuclei (di dalam container)
-docker exec rengine-celery-1 nuclei -update-templates
+docker exec parakang-celery-1 nuclei -update-templates
 
 # Verifikasi direktori DAST ada
-docker exec rengine-celery-1 ls /root/nuclei-templates/dast/
+docker exec parakang-celery-1 ls /root/nuclei-templates/dast/
 # Output yang diharapkan: ai  cves  vulnerabilities
 
 # Hitung total template DAST
-docker exec rengine-celery-1 find /root/nuclei-templates/dast/ -name "*.yaml" | wc -l
+docker exec parakang-celery-1 find /root/nuclei-templates/dast/ -name "*.yaml" | wc -l
 ```
 
 ### Menghapus False Positive
@@ -383,7 +383,7 @@ Di halaman **Scan Findings → Vulnerabilities**, klik tombol hapus pada temuan 
 
 ```bash
 # Lihat dari database langsung
-docker exec rengine-db-1 psql -U rengine rengine -c \
+docker exec parakang-db-1 psql -U parakang parakang -c \
   "SELECT name, severity, http_url FROM startScan_vulnerability \
    ORDER BY id DESC LIMIT 20;"
 ```
@@ -394,7 +394,7 @@ Untuk menggunakan template nuclei sendiri:
 
 1. Salin template ke dalam container:
    ```bash
-   docker cp my-template.yaml rengine-celery-1:/root/nuclei-templates/custom/
+   docker cp my-template.yaml parakang-celery-1:/root/nuclei-templates/custom/
    ```
 
 2. Referensikan di YAML engine:
@@ -419,7 +419,7 @@ Untuk menggunakan template nuclei sendiri:
 
 ```bash
 # 1. Clone repository
-git clone <url-repo-ini> reNgine-Custom && cd reNgine-Custom
+git clone <url-repo-ini> paraKang-Custom && cd paraKang-Custom
 
 # 2. Konfigurasi environment
 cp .env.example .env
@@ -457,7 +457,7 @@ Panduan berdasarkan RAM:
 ### Pembaruan
 
 ```bash
-cd reNgine-Custom && sudo ./update.sh
+cd paraKang-Custom && sudo ./update.sh
 ```
 
 ---
@@ -479,14 +479,14 @@ Semua perubahan dilacak melalui git. Tabel di bawah mencatat riwayat commit seja
 | `67c7022` | 2026-03-08 | fix: crash osint job.get() dengan allow_join_result(); perbaiki log domain tidak valid |
 | `5e9752f` | 2026-03-08 | fix(osint): gunakan sumber theHarvester gratis saja (bukan -b all) |
 | `bc40df0` | 2026-03-08 | fix(deps): perbaiki konflik versi tenacity dengan langchain_core |
-| `ca742bd` | 2026-03-08 | fix(osint): perbaikan integrasi tool OSINT; nonaktifkan notifikasi update dari upstream reNgine |
+| `ca742bd` | 2026-03-08 | fix(osint): perbaikan integrasi tool OSINT; nonaktifkan notifikasi update dari upstream paraKang |
 | `73ef07b` | 2026-03-07 | fix(osint): pin GooFuzz ke v1.2.6; tambah jq ke Dockerfile |
 | `a55bf8c` | 2026-03-07 | fix: perbaikan integrasi Ollama, report generation, dan beberapa fungsi umum |
 | `b81c587` | 2026-03-02 | fix: perbaikan konfigurasi Docker Compose (network binding, healthcheck) |
 | `b8601d5` | 2026-02-28 | fix: report generation 500 error (pin pydyf); perbaiki OpenAI module import |
 | `b97625c` | 2026-02-28 | feat: optimalkan Gunicorn; satukan network binding ke 0.0.0.0; tutup 7 celah keamanan HIGH |
 | `dc1efef` | 2026-02-28 | fix(gunicorn): naikkan limit-request-line ke 8190 untuk DataTables dengan query panjang |
-| `49e8e06` | 2026-02-27 | feat: fork awal reNgine-Custom; audit keamanan 27 temuan (2 CRITICAL, 7 HIGH, 10 MEDIUM, 8 LOW), semua diperbaiki; hardening Nginx |
+| `49e8e06` | 2026-02-27 | feat: fork awal paraKang-Custom; audit keamanan 27 temuan (2 CRITICAL, 7 HIGH, 10 MEDIUM, 8 LOW), semua diperbaiki; hardening Nginx |
 
 ### Ringkasan Keamanan (Audit Awal)
 
@@ -498,7 +498,7 @@ Semua perubahan dilacak melalui git. Tabel di bawah mencatat riwayat commit seja
 | LOW | 8 | Semua diperbaiki |
 | **Total** | **27** | **Semua diperbaiki** |
 
-Detail lengkap tersedia di [RENGINE_DEEP_AUDIT_V2.md](RENGINE_DEEP_AUDIT_V2.md).
+Detail lengkap tersedia di [PARAKANG_DEEP_AUDIT_V2.md](PARAKANG_DEEP_AUDIT_V2.md).
 
 ---
 

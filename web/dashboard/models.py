@@ -1,5 +1,5 @@
 from django.db import models
-from reNgine.definitions import *
+from paraKang.definitions import *
 from django.contrib.auth.models import User
 
 

@@ -28,7 +28,7 @@ jobs:
           <head>
             <meta charset='UTF-8'>
             <meta name='viewport' content='width=device-width, initial-scale=1.0'>
-            <title>reNgine Documentation</title>
+            <title>paraKang Documentation</title>
             <link rel='stylesheet' href='https://cdnjs.cloudflare.com/ajax/libs/github-markdown-css/5.1.0/github-markdown.min.css'>
             <style>
               .markdown-body {

@@ -5,9 +5,9 @@ import sys
 
 
 def main():
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
-    # show rengine artwork
-    f = open('art/reNgine.txt', 'r')
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'paraKang.settings')
+    # show parakang artwork
+    f = open('art/paraKang.txt', 'r')
     file_contents = f.read()
     print (file_contents)
     f.close()

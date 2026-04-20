@@ -25,7 +25,7 @@ from django.template.defaultfilters import slugify
 from startScan.models import *
 from targetApp.models import Domain
 from dashboard.models import *
-from reNgine.definitions import *
+from paraKang.definitions import *
 
 
 logger = logging.getLogger(__name__)
@@ -285,7 +285,7 @@ def on_user_logged_out(sender, request, **kwargs):
         request,
         messages.INFO,
         'You have been successfully logged out. Thank you ' +
-        'for using reNgine.')
+        'for using paraKang.')
 
 
 @receiver(user_logged_in)

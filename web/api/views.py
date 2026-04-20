@@ -22,14 +22,14 @@ from django.conf import settings
 
 from dashboard.models import *
 from recon_note.models import *
-from reNgine.celery import app
-from reNgine.common_func import *
-from reNgine.database_utils import *
-from reNgine.definitions import ABORTED_TASK, INITIATED_TASK, LIVE_SCAN
-from reNgine.tasks import *
-from reNgine.llm import *
-from reNgine.utilities import remove_lead_and_trail_slash
-from reNgine.security import sanitize_shell_arg, is_safe_path
+from paraKang.celery import app
+from paraKang.common_func import *
+from paraKang.database_utils import *
+from paraKang.definitions import ABORTED_TASK, INITIATED_TASK, LIVE_SCAN
+from paraKang.tasks import *
+from paraKang.llm import *
+from paraKang.utilities import remove_lead_and_trail_slash
+from paraKang.security import sanitize_shell_arg, is_safe_path
 from scanEngine.models import *
 from startScan.models import *
 from startScan.models import EndPoint
@@ -1342,10 +1342,10 @@ class ListInterestingKeywords(APIView):
 		return Response(keywords)
 
 
-class RengineUpdateCheck(APIView):
-	"""Cek apakah ada commit baru di repository lokal reNgine-Custom.
+class ParaKangUpdateCheck(APIView):
+	"""Cek apakah ada commit baru di repository lokal paraKang-Custom.
 
-	File web/reNgine/.repo_head diperbarui otomatis oleh git hook
+	File web/paraKang/.repo_head diperbarui otomatis oleh git hook
 	post-commit setiap kali commit baru dibuat.  Endpoint ini membaca
 	hash HEAD tersebut, membandingkan dengan hash yang terakhir
 	dinotifikasikan (disimpan di Django cache), dan membuat in-app
@@ -1353,12 +1353,12 @@ class RengineUpdateCheck(APIView):
 
 	Tidak ada koneksi ke GitHub upstream maupun internet luar.
 	"""
-	CACHE_KEY = 'rengine_custom_last_notified_commit'
+	CACHE_KEY = 'parakang_custom_last_notified_commit'
 
 	def get(self, request):
 		import os as _os
 
-		repo_head_file = _os.path.join(settings.BASE_DIR, 'reNgine', '.repo_head')
+		repo_head_file = _os.path.join(settings.BASE_DIR, 'paraKang', '.repo_head')
 
 		if not _os.path.isfile(repo_head_file):
 			return Response({
@@ -1384,7 +1384,7 @@ class RengineUpdateCheck(APIView):
 			# Ada commit baru sejak notifikasi terakhir
 			short_hash = current_head[:8]
 			create_inappnotification(
-				title='Commit baru di reNgine-Custom',
+				title='Commit baru di paraKang-Custom',
 				description=f'Commit terbaru: {short_hash}. Perbarui container jika perlu.',
 				notification_type=SYSTEM_LEVEL_NOTIFICATION,
 				project_slug=None,
@@ -1482,7 +1482,7 @@ class UpdateTool(APIView):
 				return Response({'status': False, 'message': str(e)})
 		else:
 			# For non-git-pull commands, validate against allowed patterns
-			from reNgine.security import validate_install_command
+			from paraKang.security import validate_install_command
 			is_valid, error = validate_install_command(update_command)
 			if not is_valid:
 				return Response({'status': False, 'message': f'Unsafe update command: {error}'})
@@ -2256,7 +2256,10 @@ class SubdomainChangesViewSet(viewsets.ModelViewSet):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
 		changes = req.query_params.get('changes')
-		domain_id = ScanHistory.objects.filter(id=scan_id)[0].domain.id
+		scan_obj = ScanHistory.objects.filter(id=scan_id).first()
+		if not scan_obj:
+			return self.queryset
+		domain_id = scan_obj.domain.id
 		scan_history_query = (
 			ScanHistory.objects
 			.filter(domain=domain_id)
@@ -2322,6 +2325,38 @@ class SubdomainChangesViewSet(viewsets.ModelViewSet):
 			return None
 		return self.paginator.paginate_queryset(
 			queryset, self.request, view=self)
+
+	def filter_queryset(self, qs):
+		"""Override to avoid DatatablesFilterBackend calling .filter()
+		on a union queryset, which Django does not support."""
+		search_value = self.request.GET.get('search[value]', None)
+		_order_col = self.request.GET.get('order[0][column]', None)
+		_order_direction = self.request.GET.get('order[0][dir]', None)
+
+		order_col = 'content_length'
+		col_map = {
+			'0': 'name',
+			'1': 'page_title',
+			'2': 'http_status',
+			'3': 'content_length',
+		}
+		if _order_col in col_map:
+			order_col = col_map[_order_col]
+		if _order_direction == 'desc':
+			order_col = f'-{order_col}'
+
+		# Union querysets don't support .filter(); materialize IDs first
+		if search_value and hasattr(qs.query, 'combinator') and qs.query.combinator:
+			ids = [obj.id for obj in qs if
+				   (search_value.lower() in (obj.name or '').lower()) or
+				   (search_value.lower() in (obj.page_title or '').lower())]
+			qs = Subdomain.objects.filter(id__in=ids)
+			if hasattr(qs.query, 'combinator'):
+				return qs
+			return qs.order_by(order_col)
+
+		# For union querysets, order_by is supported
+		return qs.order_by(order_col)
 
 
 class EndPointChangesViewSet(viewsets.ModelViewSet):
@@ -3354,7 +3389,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 class FetchFreeProxies(APIView):
 	"""Trigger a background Celery task that scrapes free HTTP proxies from
 	multiple public sources (proxifly, proxyscrape, free-proxy-list.net,
-	proxylistfree.com) and merges them into the reNgine Proxy settings.
+	proxylistfree.com) and merges them into the paraKang Proxy settings.
 
 	Optional query param:
 	  ?country=ID  — filter to a specific 2-letter ISO country code.

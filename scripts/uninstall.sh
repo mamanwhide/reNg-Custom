@@ -1,11 +1,11 @@
 #!/bin/bash
 
-cat ../web/art/reNgine.txt
-echo "Uninstalling reNgine"
+cat ../web/art/paraKang.txt
+echo "Uninstalling paraKang"
 
 if [ "$EUID" -ne 0 ]
   then
-  echo -e "\e[31mError uninstalling reNgine, Please run this script as root!\e[0m"
+  echo -e "\e[31mError uninstalling paraKang, Please run this script as root!\e[0m"
   echo -e "\e[31mExample: sudo ./uninstall.sh\e[0m"
   exit
 fi
@@ -22,7 +22,7 @@ print_status() {
     echo -e "${INFO}--------------------------------------------------${RESET}"
 }
 
-print_status "WARNING: You are about to uninstall rengine"
+print_status "WARNING: You are about to uninstall parakang"
 echo -e "${DANGER}This action is not reversible. All containers, volumes, networks, and scan results will be removed.${RESET}"
 echo -e "${DANGER}There is no going back after this point.${RESET}"
 read -p "$(echo -e ${WARNING}"Are you sure you want to proceed? (y/Y/yes/YES to confirm): "${RESET})" -r CONFIRM
@@ -35,24 +35,24 @@ if [ -z "$CONFIRM" ] || { [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ] && [ "$
     exit 0
 fi
 
-print_status "${INFO}Proceeding with uninstalling reNgine${RESET}"
+print_status "${INFO}Proceeding with uninstalling paraKang${RESET}"
 
-print_status "Stopping all containers related to reNgine..."
-docker stop $(docker ps -a -q --filter name=rengine) 2>/dev/null
+print_status "Stopping all containers related to paraKang..."
+docker stop $(docker ps -a -q --filter name=parakang) 2>/dev/null
 
-print_status "Removing all containers related to reNgine..."
-docker rm $(docker ps -a -q --filter name=rengine) 2>/dev/null
+print_status "Removing all containers related to paraKang..."
+docker rm $(docker ps -a -q --filter name=parakang) 2>/dev/null
 
-print_status "Removing all volumes related to reNgine..."
-docker volume rm $(docker volume ls -q --filter name=rengine) 2>/dev/null
+print_status "Removing all volumes related to paraKang..."
+docker volume rm $(docker volume ls -q --filter name=parakang) 2>/dev/null
 
-print_status "Removing all networks related to reNgine..."
-docker network rm $(docker network ls -q --filter name=rengine) 2>/dev/null
+print_status "Removing all networks related to paraKang..."
+docker network rm $(docker network ls -q --filter name=parakang) 2>/dev/null
 
-print_status "Removing all images related to reNgine..."
-docker rmi $(docker images -q --filter reference=rengine) 2>/dev/null
+print_status "Removing all images related to paraKang..."
+docker rmi $(docker images -q --filter reference=parakang) 2>/dev/null
 
 print_status "Performing final cleanup"
-docker system prune -f --volumes --filter "label=com.docker.compose.project=rengine"
+docker system prune -f --volumes --filter "label=com.docker.compose.project=parakang"
 
-print_status "${SUCCESS}reNgine uninstall process has been completed.${RESET}"
+print_status "${SUCCESS}paraKang uninstall process has been completed.${RESET}"

@@ -61,9 +61,9 @@ urlpatterns = [
         views.llm_toolkit_section,
         name='llm_toolkit'),
     path(
-        '<slug:slug>/rengine_settings',
-        views.rengine_settings,
-        name='rengine_settings'),
+        '<slug:slug>/parakang_settings',
+        views.parakang_settings,
+        name='parakang_settings'),
     path(
         '<slug:slug>/notification_settings',
         views.notification_settings,

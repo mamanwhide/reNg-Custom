@@ -1,0 +1,171 @@
+{% load static %}
+{% load permission_tags %}
+
+<aside class="rn-sidebar" id="rn-sidebar" role="navigation" aria-label="Main navigation">
+  <!-- Logo / Brand -->
+  <div class="rn-sidebar__brand">
+    <a href="{% url 'dashboardIndex' current_project.slug %}" class="rn-sidebar__logo">
+      <span class="rn-sidebar__logo-icon"><i class="fe-shield"></i></span>
+      <span class="rn-sidebar__logo-text">paraKang</span>
+    </a>
+    <button class="rn-sidebar__toggle" id="sidebar-toggle" type="button" aria-label="Toggle sidebar">
+      <i class="fe-chevrons-left" id="sidebar-toggle-icon"></i>
+    </button>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="rn-sidebar__nav" data-simplebar aria-label="Sidebar menu">
+    <ul class="rn-sidebar__menu" role="list">
+
+      <!-- Dashboard -->
+      <li class="rn-sidebar__item">
+        <a href="{% url 'dashboardIndex' current_project.slug %}" class="rn-sidebar__link" data-tippy-content="Dashboard">
+          <span class="rn-sidebar__icon"><i class="fe-home"></i></span>
+          <span class="rn-sidebar__label">Dashboard</span>
+        </a>
+      </li>
+
+      <!-- Assets (group) -->
+      <li class="rn-sidebar__item rn-sidebar__item--has-sub">
+        <a href="javascript:void(0)" class="rn-sidebar__link" data-tippy-content="Assets">
+          <span class="rn-sidebar__icon"><i class="fe-crosshair"></i></span>
+          <span class="rn-sidebar__label">Assets</span>
+          <span class="rn-sidebar__arrow"><i class="fe-chevron-right"></i></span>
+        </a>
+        <ul class="rn-sidebar__submenu">
+          <li><a href="{% url 'list_target' current_project.slug %}" class="rn-sidebar__sublink">Targets</a></li>
+          <li><a href="{% url 'list_organization' current_project.slug %}" class="rn-sidebar__sublink">Organizations</a></li>
+          <li><a href="{% url 'all_subdomains' current_project.slug %}" class="rn-sidebar__sublink">All Subdomains</a></li>
+          <li><a href="{% url 'all_endpoints' current_project.slug %}" class="rn-sidebar__sublink">All Endpoints</a></li>
+        </ul>
+      </li>
+
+      <!-- Scans (group) -->
+      <li class="rn-sidebar__item rn-sidebar__item--has-sub">
+        <a href="javascript:void(0)" class="rn-sidebar__link" data-tippy-content="Scans">
+          <span class="rn-sidebar__icon"><i class="fe-activity"></i></span>
+          <span class="rn-sidebar__label">Scans</span>
+          <span class="rn-sidebar__arrow"><i class="fe-chevron-right"></i></span>
+        </a>
+        <ul class="rn-sidebar__submenu">
+          <li><a href="{% url 'scan_history' current_project.slug %}" class="rn-sidebar__sublink">Scan History</a></li>
+          <li><a href="{% url 'subscan_history' current_project.slug %}" class="rn-sidebar__sublink">Sub Scan History</a></li>
+          <li><a href="{% url 'scheduled_scan_view' current_project.slug %}" class="rn-sidebar__sublink">Scheduled Scans</a></li>
+          {% if user|can:'modify_scan_configurations' %}
+          <li><a href="{% url 'scan_engine_index' current_project.slug %}" class="rn-sidebar__sublink">Scan Engines</a></li>
+          {% endif %}
+        </ul>
+      </li>
+
+      <!-- Vulnerabilities -->
+      <li class="rn-sidebar__item">
+        <a href="{% url 'all_vulns' current_project.slug %}" class="rn-sidebar__link" data-tippy-content="Vulnerabilities">
+          <span class="rn-sidebar__icon"><i class="fe-alert-triangle"></i></span>
+          <span class="rn-sidebar__label">Vulnerabilities</span>
+        </a>
+      </li>
+
+      <!-- Intelligence (group) -->
+      <li class="rn-sidebar__item rn-sidebar__item--has-sub">
+        <a href="javascript:void(0)" class="rn-sidebar__link" data-tippy-content="Intelligence">
+          <span class="rn-sidebar__icon"><i class="fe-cpu"></i></span>
+          <span class="rn-sidebar__label">Intelligence</span>
+          <span class="rn-sidebar__arrow"><i class="fe-chevron-right"></i></span>
+        </a>
+        <ul class="rn-sidebar__submenu">
+          <li><a href="{% url 'list_note' current_project.slug %}" class="rn-sidebar__sublink">Recon Notes</a></li>
+          {% if user|can:'modify_interesting_lookup' %}
+          <li><a href="{% url 'interesting_lookup' current_project.slug %}" class="rn-sidebar__sublink">Interesting Lookup</a></li>
+          {% endif %}
+          {% if user|can:'modify_wordlists' %}
+          <li><a href="{% url 'wordlist_list' current_project.slug %}" class="rn-sidebar__sublink">Wordlists</a></li>
+          {% endif %}
+        </ul>
+      </li>
+
+      {% if user_preferences.bug_bounty_mode %}
+      <!-- Bounty Hub -->
+      <li class="rn-sidebar__item rn-sidebar__item--has-sub">
+        <a href="javascript:void(0)" class="rn-sidebar__link" data-tippy-content="Bounty Hub">
+          <span class="rn-sidebar__icon"><i class="fe-command"></i></span>
+          <span class="rn-sidebar__label">Bounty Hub</span>
+          <span class="rn-sidebar__arrow"><i class="fe-chevron-right"></i></span>
+        </a>
+        <ul class="rn-sidebar__submenu">
+          <li><a href="{% url 'list_bountyhub_programs' current_project.slug %}" class="rn-sidebar__sublink">Programs Dashboard</a></li>
+          <li><a href="javascript:void(0)" onclick="handleSyncBookmarkedProgramsSwal()" class="rn-sidebar__sublink">Sync Bookmarked</a></li>
+        </ul>
+      </li>
+      {% endif %}
+
+      <!-- Divider -->
+      <li class="rn-sidebar__divider" role="separator" aria-hidden="true"></li>
+
+      <!-- Settings (group) -->
+      {% if user|can:'modify_scan_configurations' or user|can:'modify_system_configurations' or user|can:'modify_scan_report' %}
+      <li class="rn-sidebar__item rn-sidebar__item--has-sub">
+        <a href="javascript:void(0)" class="rn-sidebar__link" data-tippy-content="Settings">
+          <span class="rn-sidebar__icon"><i class="fe-settings"></i></span>
+          <span class="rn-sidebar__label">Settings</span>
+          <span class="rn-sidebar__arrow"><i class="fe-chevron-right"></i></span>
+        </a>
+        <ul class="rn-sidebar__submenu">
+          {% if user|can:'modify_scan_configurations' %}
+          <li><a href="{% url 'proxy_settings' current_project.slug %}" class="rn-sidebar__sublink">Proxies</a></li>
+          <li><a href="{% url 'tool_settings' current_project.slug %}" class="rn-sidebar__sublink">Tool Settings</a></li>
+          {% endif %}
+          {% if user|can:'modify_system_configurations' %}
+          <li><a href="{% url 'api_vault' current_project.slug %}" class="rn-sidebar__sublink">API Vault</a></li>
+          <li><a href="{% url 'llm_toolkit' current_project.slug %}" class="rn-sidebar__sublink">LLM Toolkit</a></li>
+          <li><a href="{% url 'tool_arsenal' current_project.slug %}" class="rn-sidebar__sublink">Tools Arsenal</a></li>
+          {% endif %}
+          {% if user|can:'modify_scan_report' %}
+          <li><a href="{% url 'report_settings' current_project.slug %}" class="rn-sidebar__sublink">Report Settings</a></li>
+          {% endif %}
+          {% if user|can:'modify_system_configurations' %}
+          <li><a href="{% url 'parakang_settings' current_project.slug %}" class="rn-sidebar__sublink">paraKang Settings</a></li>
+          {% endif %}
+          {% if user|can:'modify_scan_configurations' %}
+            {% if user_preferences.bug_bounty_mode %}
+            <li><a href="{% url 'hackerone_settings' current_project.slug %}" class="rn-sidebar__sublink">HackerOne Settings</a></li>
+            {% endif %}
+          <li><a href="{% url 'notification_settings' current_project.slug %}" class="rn-sidebar__sublink">Notification Settings</a></li>
+          {% endif %}
+        </ul>
+      </li>
+      {% endif %}
+
+    </ul>
+  </nav>
+
+  <!-- Bottom section: Project Switcher -->
+  <div class="rn-sidebar__footer">
+    <div class="rn-sidebar__project-switcher" id="sidebar-project-switcher">
+      <button class="rn-sidebar__project-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false" data-tippy-content="Switch Project">
+        <span class="rn-sidebar__project-icon"><i class="fe-folder"></i></span>
+        <span class="rn-sidebar__project-name">{{ current_project.name }}</span>
+        <i class="fe-chevron-up rn-sidebar__project-arrow"></i>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-dark rn-sidebar__project-dropdown">
+        {% for project in projects %}
+        <li>
+          <a href="/{{ project.slug }}/dashboard" class="dropdown-item {% if project == current_project %}active{% endif %}">
+            <i class="fe-folder me-2"></i> {{ project.name }}
+          </a>
+        </li>
+        {% endfor %}
+        {% if request.user|can:'modify_targets' %}
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <a href="javascript:void(0)" onclick="add_project_modal()" class="dropdown-item">
+            <i class="fe-plus me-2"></i> Create New Project
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</aside>
+
+<!-- Mobile overlay -->
+<div class="rn-sidebar-overlay" id="rn-sidebar-overlay"></div>

@@ -6,15 +6,15 @@ ARG GOVERSION=1.21.5
 
 RUN ARCH=$(dpkg --print-architecture) \ 
     && if [ "${ARCH}" != "arm64" ] && [ "${ARCH}" != "amd64" ]; then \
-      echo "reNgine not supported, encountered unknown architecture: ${TARGETPLATFORM}" \
+      echo "paraKang not supported, encountered unknown architecture: ${TARGETPLATFORM}" \
       && exit 1; \
     fi
 
 # Labels and Credits
 LABEL \
-    name="reNgine" \
+    name="paraKang" \
     author="Yogesh Ojha <yogesh.ojha11@gmail.com>" \
-    description="reNgine is a automated pipeline of recon process, useful for information gathering during web application penetration testing."
+    description="paraKang is a automated pipeline of recon process, useful for information gathering during web application penetration testing."
 
 # Environment Variables
 ENV DEBIAN_FRONTEND="noninteractive" \
@@ -120,9 +120,9 @@ RUN pip3 install --upgrade setuptools==72.1.0 \
 COPY . /usr/src/app/
 
 # Create non-root user for running application processes
-RUN groupadd -r rengine && useradd -r -g rengine -d /home/rengine -m -s /bin/bash rengine \
-    && chown -R rengine:rengine /usr/src/app \
+RUN groupadd -r parakang && useradd -r -g parakang -d /home/parakang -m -s /bin/bash parakang \
+    && chown -R parakang:parakang /usr/src/app \
     && mkdir -p /var/log/gunicorn \
-    && chown -R rengine:rengine /var/log/gunicorn
+    && chown -R parakang:parakang /var/log/gunicorn
 
 EXPOSE 8000

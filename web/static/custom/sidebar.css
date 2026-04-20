@@ -1,0 +1,846 @@
+/* =============================================================================
+   paraKang Sidebar Navigation v1.0
+   Collapsible vertical sidebar — replaces horizontal topnav.
+   Uses existing --rn-* CSS variables from soc-global-theme.css.
+   ============================================================================= */
+
+/* --- Sidebar Variables --- */
+:root {
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --sidebar-bg: #0d1f3c;
+  --sidebar-bg-hover: #132844;
+  --sidebar-text: #8899b4;
+  --sidebar-text-hover: #e0e6f0;
+  --sidebar-text-active: #00d4ff;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-accent: #00d4ff;
+  --sidebar-icon-size: 20px;
+  --sidebar-transition: 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --header-height: 56px;
+}
+
+
+/* =============================================================================
+   1. Sidebar Base
+   ============================================================================= */
+
+.rn-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background-color: var(--sidebar-bg);
+  z-index: 1040;
+  display: flex;
+  flex-direction: column;
+  transition: width var(--sidebar-transition);
+  overflow: hidden;
+  border-right: 1px solid var(--sidebar-border);
+}
+
+/* --- Brand / Logo --- */
+.rn-sidebar__brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--header-height);
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+  flex-shrink: 0;
+}
+
+.rn-sidebar__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.rn-sidebar__logo-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  color: var(--sidebar-accent);
+  flex-shrink: 0;
+}
+
+.rn-sidebar__logo-text {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  transition: opacity 200ms ease, width 200ms ease;
+}
+
+.rn-sidebar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--sidebar-text);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 200ms ease, color 200ms ease, transform var(--sidebar-transition);
+  flex-shrink: 0;
+}
+
+.rn-sidebar__toggle:hover {
+  background: var(--sidebar-bg-hover);
+  color: var(--sidebar-text-hover);
+}
+
+
+/* =============================================================================
+   2. Navigation Menu
+   ============================================================================= */
+
+.rn-sidebar__nav {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 0;
+}
+
+.rn-sidebar__menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* --- Menu Item --- */
+.rn-sidebar__item {
+  margin: 1px 8px;
+}
+
+.rn-sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  color: var(--sidebar-text);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 200ms ease, color 200ms ease;
+  position: relative;
+}
+
+.rn-sidebar__link:hover {
+  background: var(--sidebar-bg-hover);
+  color: var(--sidebar-text-hover);
+  text-decoration: none;
+}
+
+.rn-sidebar__link.active {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--sidebar-text-active);
+}
+
+.rn-sidebar__link.active::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: var(--sidebar-accent);
+  border-radius: 0 3px 3px 0;
+}
+
+/* --- Icon --- */
+.rn-sidebar__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sidebar-icon-size);
+  height: var(--sidebar-icon-size);
+  font-size: var(--sidebar-icon-size);
+  flex-shrink: 0;
+}
+
+/* --- Label --- */
+.rn-sidebar__label {
+  flex: 1;
+  transition: opacity 200ms ease;
+}
+
+/* --- Arrow (submenu indicator) --- */
+.rn-sidebar__arrow {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  transition: transform 300ms ease, opacity 200ms ease;
+}
+
+.rn-sidebar__item--has-sub.open > .rn-sidebar__link > .rn-sidebar__arrow {
+  transform: rotate(90deg);
+}
+
+
+/* =============================================================================
+   3. Submenu
+   ============================================================================= */
+
+.rn-sidebar__submenu {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 300ms ease;
+}
+
+.rn-sidebar__item--has-sub.open > .rn-sidebar__submenu {
+  max-height: 500px;
+}
+
+.rn-sidebar__sublink {
+  display: block;
+  padding: 7px 12px 7px 44px;
+  color: var(--sidebar-text);
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  border-radius: 6px;
+  margin: 1px 0;
+  transition: background 200ms ease, color 200ms ease;
+  white-space: nowrap;
+}
+
+.rn-sidebar__sublink:hover {
+  background: var(--sidebar-bg-hover);
+  color: var(--sidebar-text-hover);
+  text-decoration: none;
+}
+
+.rn-sidebar__sublink.active {
+  color: var(--sidebar-text-active);
+  background: rgba(0, 212, 255, 0.08);
+}
+
+
+/* =============================================================================
+   4. Divider
+   ============================================================================= */
+
+.rn-sidebar__divider {
+  height: 1px;
+  background: var(--sidebar-border);
+  margin: 8px 16px;
+}
+
+
+/* =============================================================================
+   5. Footer / Project Switcher
+   ============================================================================= */
+
+.rn-sidebar__footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--sidebar-border);
+  padding: 8px;
+}
+
+.rn-sidebar__project-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sidebar-text-hover);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 200ms ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.rn-sidebar__project-btn:hover {
+  background: var(--sidebar-bg-hover);
+}
+
+.rn-sidebar__project-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  font-size: 16px;
+  color: var(--sidebar-accent);
+  flex-shrink: 0;
+}
+
+.rn-sidebar__project-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 200ms ease;
+}
+
+.rn-sidebar__project-arrow {
+  font-size: 14px;
+  color: var(--sidebar-text);
+  flex-shrink: 0;
+  transition: opacity 200ms ease;
+}
+
+.rn-sidebar__project-dropdown {
+  width: calc(var(--sidebar-width) - 16px) !important;
+  background: var(--sidebar-bg) !important;
+  border: 1px solid var(--sidebar-border) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
+}
+
+.rn-sidebar__project-dropdown .dropdown-item {
+  color: var(--sidebar-text) !important;
+  font-size: 0.8125rem;
+  padding: 8px 16px;
+  border-radius: 4px;
+  margin: 2px 4px;
+}
+
+.rn-sidebar__project-dropdown .dropdown-item:hover {
+  background: var(--sidebar-bg-hover) !important;
+  color: var(--sidebar-text-hover) !important;
+}
+
+.rn-sidebar__project-dropdown .dropdown-item.active {
+  background: rgba(0, 212, 255, 0.12) !important;
+  color: var(--sidebar-accent) !important;
+}
+
+
+/* =============================================================================
+   6. Collapsed State
+   ============================================================================= */
+
+.rn-sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+.rn-sidebar.collapsed .rn-sidebar__logo-text,
+.rn-sidebar.collapsed .rn-sidebar__label,
+.rn-sidebar.collapsed .rn-sidebar__arrow,
+.rn-sidebar.collapsed .rn-sidebar__project-name,
+.rn-sidebar.collapsed .rn-sidebar__project-arrow {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.rn-sidebar.collapsed .rn-sidebar__toggle {
+  transform: rotate(180deg);
+}
+
+.rn-sidebar.collapsed .rn-sidebar__link {
+  justify-content: center;
+  padding: 10px;
+}
+
+.rn-sidebar.collapsed .rn-sidebar__link.active::before {
+  left: 0;
+}
+
+.rn-sidebar.collapsed .rn-sidebar__submenu {
+  max-height: 0 !important;
+}
+
+.rn-sidebar.collapsed .rn-sidebar__project-btn {
+  justify-content: center;
+  padding: 10px;
+}
+
+
+/* =============================================================================
+   7. Main Content Area Adjustment
+   Override ALL app.min.css rules that conflict with sidebar layout.
+   app.min.css sets: .content-page{margin-left:240px; margin-top:70px; padding:0 15px 65px}
+   and horizontal mode: .content-page{margin-left:0!important; padding:55px 15px 65px}
+   ============================================================================= */
+
+/* Reset #wrapper — app.min.css sets overflow:hidden which clips content */
+body.rn-sidebar-layout #wrapper {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+/* Main content area — positioned next to sidebar */
+body.rn-sidebar-layout .content-page {
+  margin-left: var(--sidebar-width) !important;
+  margin-top: 0 !important;
+  padding-top: var(--header-height) !important;
+  padding-bottom: 24px !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
+  transition: margin-left var(--sidebar-transition);
+}
+
+body.rn-sidebar-layout.sidebar-collapsed .content-page {
+  margin-left: var(--sidebar-collapsed-width) !important;
+}
+
+/* Header bar — fixed at top, right of sidebar */
+body.rn-sidebar-layout .rn-header {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  left: var(--sidebar-width) !important;
+  height: var(--header-height) !important;
+  z-index: 1001 !important;
+  background: var(--rn-bg-navbar, #ffffff) !important;
+  border-bottom: 1px solid var(--rn-border-navbar, #e2e6ed) !important;
+  box-shadow: var(--rn-navbar-shadow, 0 1px 4px rgba(0,0,0,0.06)) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 0 16px !important;
+  transition: left var(--sidebar-transition) !important;
+}
+
+body.rn-sidebar-layout.sidebar-collapsed .rn-header {
+  left: var(--sidebar-collapsed-width) !important;
+}
+
+
+/* =============================================================================
+   8. Header Bar (replaces .navbar-custom role for top utilities)
+   ============================================================================= */
+
+.rn-header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: var(--sidebar-width);
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  background-color: var(--rn-bg-navbar, #ffffff);
+  border-bottom: 1px solid var(--rn-border-navbar, #e2e6ed);
+  box-shadow: var(--rn-navbar-shadow, 0 1px 4px rgba(0,0,0,0.06));
+  z-index: 1030;
+  transition: left var(--sidebar-transition), background-color 300ms ease;
+}
+
+.rn-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.rn-header__right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Header nav links (replaces .navbar-custom .topnav-menu .nav-link) */
+.rn-header .nav-link {
+  padding: 0 12px;
+  color: var(--rn-text-secondary, #6c757d);
+  display: flex;
+  align-items: center;
+  line-height: var(--header-height);
+  max-height: var(--header-height);
+}
+
+.rn-header .dropdown .nav-link.show {
+  background-color: rgba(50, 58, 70, 0.03);
+}
+
+/* Search bar inside header */
+.rn-header .app-search {
+  height: var(--header-height);
+  display: flex;
+  align-items: center;
+  max-width: 320px;
+}
+
+.rn-header .app-search .form-control {
+  border: 1px solid var(--rn-border-navbar, #e2e6ed);
+  height: 36px;
+  padding-left: 16px;
+  padding-right: 0;
+  color: var(--rn-text-primary, #323a46);
+  background-color: var(--rn-bg-card, #f3f7f9);
+  box-shadow: none;
+  border-radius: 6px 0 0 6px;
+  font-size: 0.8125rem;
+}
+
+.rn-header .app-search .form-control:focus {
+  background-color: var(--rn-bg-body, #fff);
+  border-color: var(--rn-text-link, #3283f6);
+}
+
+.rn-header .app-search .form-control::placeholder {
+  color: var(--rn-text-muted, #adb5bd);
+  font-size: 0.8125rem;
+}
+
+.rn-header .app-search .input-group-text,
+.rn-header .app-search .btn {
+  background-color: var(--rn-bg-card, #f3f7f9);
+  border: 1px solid var(--rn-border-navbar, #e2e6ed);
+  border-left: none;
+  color: var(--rn-text-muted, #adb5bd);
+  border-radius: 0 6px 6px 0;
+  box-shadow: none !important;
+}
+
+/* Notification icon styles */
+.rn-header .noti-icon {
+  font-size: 21px;
+  vertical-align: middle;
+  color: var(--rn-text-secondary, #6c757d);
+}
+
+/* User profile link */
+.rn-header .nav-user {
+  padding: 0 12px !important;
+  color: var(--rn-text-secondary, #6c757d);
+}
+
+.rn-header .pro-user-name {
+  color: var(--rn-text-primary, #323a46);
+}
+
+/* Dropdown menus */
+.rn-header .dropdown-menu {
+  margin-top: 0;
+}
+
+.rn-header .profile-dropdown {
+  min-width: 170px;
+}
+
+.rn-header .profile-dropdown i {
+  vertical-align: middle;
+  margin-right: 5px;
+}
+
+/* Mobile hamburger — only visible on small screens */
+.rn-header__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--rn-text-secondary, #546e7a);
+  font-size: 20px;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.rn-header__hamburger:hover {
+  background: var(--rn-bg-card-hover, #f5f7fb);
+}
+
+/* Breadcrumb in header */
+.rn-header__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8125rem;
+  color: var(--rn-text-muted, #90a4ae);
+}
+
+.rn-header__breadcrumb a {
+  color: var(--rn-text-secondary, #546e7a);
+  text-decoration: none;
+}
+
+.rn-header__breadcrumb a:hover {
+  color: var(--rn-text-link, #3283f6);
+}
+
+
+/* =============================================================================
+   9. Mobile Overlay
+   ============================================================================= */
+
+.rn-sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1035;
+}
+
+.rn-sidebar-overlay.active {
+  display: block;
+}
+
+
+/* =============================================================================
+   10. Responsive Breakpoints
+   ============================================================================= */
+
+/* Tablet: auto-collapse sidebar */
+@media (max-width: 1199.98px) {
+  .rn-sidebar {
+    width: var(--sidebar-collapsed-width);
+  }
+
+  .rn-sidebar .rn-sidebar__logo-text,
+  .rn-sidebar .rn-sidebar__label,
+  .rn-sidebar .rn-sidebar__arrow,
+  .rn-sidebar .rn-sidebar__project-name,
+  .rn-sidebar .rn-sidebar__project-arrow {
+    opacity: 0;
+    width: 0;
+    overflow: hidden;
+  }
+
+  .rn-sidebar .rn-sidebar__toggle {
+    transform: rotate(180deg);
+  }
+
+  .rn-sidebar .rn-sidebar__link {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .rn-sidebar .rn-sidebar__submenu {
+    max-height: 0 !important;
+  }
+
+  .rn-sidebar .rn-sidebar__project-btn {
+    justify-content: center;
+    padding: 10px;
+  }
+
+  body.rn-sidebar-layout .content-page {
+    margin-left: var(--sidebar-collapsed-width) !important;
+  }
+
+  body.rn-sidebar-layout .rn-header {
+    left: var(--sidebar-collapsed-width);
+  }
+
+  /* Expand on hover for tablet */
+  .rn-sidebar:hover {
+    width: var(--sidebar-width);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .rn-sidebar:hover .rn-sidebar__logo-text,
+  .rn-sidebar:hover .rn-sidebar__label,
+  .rn-sidebar:hover .rn-sidebar__arrow,
+  .rn-sidebar:hover .rn-sidebar__project-name,
+  .rn-sidebar:hover .rn-sidebar__project-arrow {
+    opacity: 1;
+    width: auto;
+  }
+
+  .rn-sidebar:hover .rn-sidebar__toggle {
+    transform: rotate(0deg);
+  }
+
+  .rn-sidebar:hover .rn-sidebar__link {
+    justify-content: flex-start;
+    padding: 9px 12px;
+  }
+
+  .rn-sidebar:hover .rn-sidebar__project-btn {
+    justify-content: flex-start;
+    padding: 8px 10px;
+  }
+}
+
+/* Mobile: sidebar as overlay */
+@media (max-width: 767.98px) {
+  .rn-sidebar {
+    width: var(--sidebar-width);
+    transform: translateX(-100%);
+    box-shadow: none;
+  }
+
+  .rn-sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: 8px 0 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .rn-sidebar .rn-sidebar__logo-text,
+  .rn-sidebar .rn-sidebar__label,
+  .rn-sidebar .rn-sidebar__arrow,
+  .rn-sidebar .rn-sidebar__project-name,
+  .rn-sidebar .rn-sidebar__project-arrow {
+    opacity: 1;
+    width: auto;
+  }
+
+  .rn-sidebar .rn-sidebar__toggle {
+    display: none;
+  }
+
+  .rn-sidebar .rn-sidebar__link {
+    justify-content: flex-start;
+    padding: 9px 12px;
+  }
+
+  .rn-sidebar .rn-sidebar__project-btn {
+    justify-content: flex-start;
+    padding: 8px 10px;
+  }
+
+  body.rn-sidebar-layout .content-page {
+    margin-left: 0 !important;
+  }
+
+  body.rn-sidebar-layout .rn-header {
+    left: 0;
+  }
+
+  .rn-header__hamburger {
+    display: flex;
+  }
+}
+
+
+/* =============================================================================
+   11. Neutralize ALL old framework layout elements
+   app.min.css has .navbar-custom (fixed, 70px height, z-index 1001),
+   .topnav (fixed, margin-top 70px), .left-side-menu (fixed, 240px),
+   .logo-box, etc. All must be hidden/neutralized.
+   ============================================================================= */
+
+body.rn-sidebar-layout .topnav {
+  display: none !important;
+}
+
+body.rn-sidebar-layout .navbar-custom {
+  display: none !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: static !important;
+}
+
+body.rn-sidebar-layout .logo-box {
+  display: none !important;
+}
+
+body.rn-sidebar-layout .button-menu-mobile {
+  display: none !important;
+}
+
+body.rn-sidebar-layout .left-side-menu {
+  display: none !important;
+}
+
+/* Kill the old framework's margin-top on content-page (for old 70px navbar) */
+body.rn-sidebar-layout .content-page {
+  margin-top: 0 !important;
+}
+
+/* Kill horizontal mode overrides that may linger from data attributes */
+body.rn-sidebar-layout[data-layout-mode="horizontal"] .content-page {
+  margin-left: var(--sidebar-width) !important;
+  margin-top: 0 !important;
+  padding-top: var(--header-height) !important;
+}
+
+/* Also override container-fluid max-width from horizontal mode */
+body.rn-sidebar-layout .container-fluid {
+  max-width: 100% !important;
+}
+
+/* Reset page-title-box positioning */
+body.rn-sidebar-layout .page-title-box {
+  margin: 0 0 16px !important;
+  padding: 0 !important;
+}
+
+
+/* =============================================================================
+   12. Dark Theme Support for Header
+   ============================================================================= */
+
+html[data-theme="dark"] .rn-header,
+html[data-bs-theme="dark"] .rn-header {
+  background-color: var(--rn-bg-navbar, #283046);
+  border-bottom-color: var(--rn-border-navbar, #3b4253);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+html[data-theme="dark"] .rn-header .nav-link,
+html[data-bs-theme="dark"] .rn-header .nav-link {
+  color: var(--rn-text-secondary, #b4b7bd);
+}
+
+html[data-theme="dark"] .rn-header .noti-icon,
+html[data-bs-theme="dark"] .rn-header .noti-icon {
+  color: var(--rn-text-secondary, #b4b7bd);
+}
+
+html[data-theme="dark"] .rn-header .pro-user-name,
+html[data-bs-theme="dark"] .rn-header .pro-user-name {
+  color: var(--rn-text-primary, #d0d2d6);
+}
+
+html[data-theme="dark"] .rn-header .app-search .form-control,
+html[data-bs-theme="dark"] .rn-header .app-search .form-control {
+  background-color: var(--rn-bg-card, #283046);
+  border-color: var(--rn-border-navbar, #3b4253);
+  color: var(--rn-text-primary, #d0d2d6);
+}
+
+html[data-theme="dark"] .rn-header .app-search .form-control::placeholder,
+html[data-bs-theme="dark"] .rn-header .app-search .form-control::placeholder {
+  color: var(--rn-text-muted, #676d7d);
+}
+
+html[data-theme="dark"] .rn-header .app-search .btn,
+html[data-theme="dark"] .rn-header .app-search .input-group-text,
+html[data-bs-theme="dark"] .rn-header .app-search .btn,
+html[data-bs-theme="dark"] .rn-header .app-search .input-group-text {
+  background-color: var(--rn-bg-card, #283046);
+  border-color: var(--rn-border-navbar, #3b4253);
+  color: var(--rn-text-muted, #676d7d);
+}
+
+html[data-theme="dark"] .rn-header__hamburger,
+html[data-bs-theme="dark"] .rn-header__hamburger {
+  color: var(--rn-text-secondary, #b4b7bd);
+}
+
+html[data-theme="dark"] .rn-header__hamburger:hover,
+html[data-bs-theme="dark"] .rn-header__hamburger:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+
+/* =============================================================================
+   13. Simplebar inside sidebar
+   ============================================================================= */
+
+.rn-sidebar__nav .simplebar-scrollbar::before {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.rn-sidebar__nav .simplebar-track.simplebar-vertical {
+  width: 5px;
+}

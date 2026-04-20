@@ -10,15 +10,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.safestring import mark_safe
 from rolepermissions.decorators import has_permission_decorator
 
-from reNgine.common_func import *
-from reNgine.tasks import run_command, sanitize_url
-from reNgine.security import safe_delete_scan_results, validate_domain
+from paraKang.common_func import *
+from paraKang.tasks import run_command, sanitize_url
+from paraKang.security import safe_delete_scan_results, validate_domain
 from scanEngine.models import *
 from startScan.models import *
 from targetApp.forms import *
@@ -28,8 +28,11 @@ logger = logging.getLogger(__name__)
 
 
 def index(request):
-    # TODO bring default target page
-    return render(request, 'target/index.html')
+    # Redirect to the first project's target list or dashboard
+    project = Project.objects.first()
+    if project:
+        return redirect('list_target', slug=project.slug)
+    return redirect('dashboardIndex')
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -173,6 +176,16 @@ def add_target(request, slug):
                         request,
                         messages.ERROR,
                         'Files uploaded are not .txt or .csv files.')
+                    return http.HttpResponseRedirect(reverse('add_target', kwargs={'slug': slug}))
+
+                # Enforce max file size (5 MB) to prevent DoS
+                MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+                upload_file = txt_file or csv_file
+                if upload_file.size > MAX_UPLOAD_SIZE:
+                    messages.add_message(
+                        request,
+                        messages.ERROR,
+                        f'File too large ({upload_file.size // 1024} KB). Maximum allowed is 5 MB.')
                     return http.HttpResponseRedirect(reverse('add_target', kwargs={'slug': slug}))
 
                 #Specters Fix

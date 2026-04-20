@@ -103,7 +103,7 @@ vulnerability_scan: {
     'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical'],
     # 'tags': [],                 # Nuclei tags (https://github.com/projectdiscovery/nuclei-templates)
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
-    # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
+    # 'custom_templates': []      # Nuclei custom templates uploaded in paraKang
   }
 }
 waf_detection: {

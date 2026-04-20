@@ -1735,10 +1735,10 @@ function initiateMultipleSubscan(){
 
 function detect_subdomain_cms(http_url, http_status){
 	if (http_status == 0) {
-		var message = `reNgine has earlier identified that this subdomain did not return any HTTP status and likely the subdomain is not alive. reNgine may not be able to detect any CMS, would you still like to continue?`;
+		var message = `paraKang has earlier identified that this subdomain did not return any HTTP status and likely the subdomain is not alive. paraKang may not be able to detect any CMS, would you still like to continue?`;
 	}
 	else if (http_status != 200) {
-		var message = `reNgine has earlier identified that this subdomain has HTTP status as ${http_status} and likely that reNgine will not detect any CMS, would you still like to continue?`;
+		var message = `paraKang has earlier identified that this subdomain has HTTP status as ${http_status} and likely that paraKang will not detect any CMS, would you still like to continue?`;
 	}
 
 	if (http_status != 200 || http_status == 0) {

@@ -591,7 +591,7 @@ function get_interesting_subdomains(project, target_id, scan_history_id) {
 				// </div>
 				// <div id="cardCollpase4" class="collapse show">
 				// <div class="card-body">
-				// reNgine could not identify any interesting subdomains. You can customize interesting subdomain keywords <a href="/scanEngine/interesting/lookup/">from here</a> and this section would be automatically updated.
+				// paraKang could not identify any interesting subdomains. You can customize interesting subdomain keywords <a href="/scanEngine/interesting/lookup/">from here</a> and this section would be automatically updated.
 				// </div>
 				// </div>`);
 			} else {
@@ -2684,7 +2684,7 @@ function get_most_vulnerable_target(slug=null, scan_id=null, target_id=null, ign
 				<div class="mt-4 alert alert-warning">
 				Could not find most vulnerable targets.
 				</br>
-				Once the vulnerability scan is performed, reNgine will identify the most vulnerable targets.</div>
+				Once the vulnerability scan is performed, paraKang will identify the most vulnerable targets.</div>
 			`);
 		}
 	});
@@ -2779,7 +2779,7 @@ function get_most_common_vulnerability(slug=null, scan_id=null, target_id=null, 
 				<div class="mt-4 alert alert-warning">
 				Could not find Most Common Vulnerabilities.
 				</br>
-				Once the vulnerability scan is performed, reNgine will identify the Most Common Vulnerabilities.</div>
+				Once the vulnerability scan is performed, paraKang will identify the Most Common Vulnerabilities.</div>
 			`);
 		}
 	});

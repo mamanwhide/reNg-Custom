@@ -10,13 +10,19 @@
     <link rel="shortcut icon" href="/staticfiles/img/favicon.png">
     <link href="{% static 'bootstrap/bootstrap.min.css' %}" rel="stylesheet" type="text/css" id="bootstrap-stylesheet" />
     <link href="{% static 'assets/css/app.min.css' %}" rel="stylesheet" type="text/css" id="main-stylesheet" />
-    <link href="{% static 'bootstrap/bootstrap-dark.min.css' %}" rel="stylesheet" type="text/css" id="bootstrap-dark-stylesheet" />
-    <link href="{% static 'assets/css/app-dark.min.css' %}" rel="stylesheet" type="text/css" id="main-dark-stylesheet" />
     <link href="{% static 'assets/css/icons.min.css' %}" rel="stylesheet" type="text/css" />
     <link href="{% static 'plugins/snackbar/snackbar.min.css' %}" rel="stylesheet" type="text/css" />
     <link href="{% static 'plugins/sweetalert2/sweetalert2.min.css' %}" rel="stylesheet" type="text/css" />
     <link href="{% static 'plugins/switches/switches.min.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'custom/design-tokens.css' %}" rel="stylesheet" type="text/css" />
     <link href="{% static 'custom/custom.css' %}" rel="stylesheet" type="text/css" />
+    <link href="{% static 'custom/sidebar.css' %}" rel="stylesheet" type="text/css" />
+    <script>
+      // Apply dark theme early to prevent flash of light theme
+      if (localStorage.getItem('parakang-theme') === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    </script>
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" type="text/css" href="{% static 'plugins/datatable/global.css' %}">
     <!-- <link rel="stylesheet" type="text/css" href="{% static 'plugins/datatable/custom.css' %}"> -->
@@ -57,16 +63,16 @@
     {% endblock custom_js_css_link %}
   </head>
 
-  <body class="loading" data-layout-mode="horizontal" data-rengine-version="{{ RENGINE_CURRENT_VERSION }}" data-current-project="{{ current_project.slug }}">
-    <!-- Topbar begins -->
+  <body class="loading rn-sidebar-layout" data-parakang-version="{{ PARAKANG_CURRENT_VERSION }}" data-current-project="{{ current_project.slug }}">
+    {# Sidebar navigation #}
+    {% include 'base/_items/sidebar.html' %}
+
+    {# Header bar (search, notifications, user) #}
     {% include 'base/_items/top_bar.html' %}
-    {# topbar ends #}
-    <div id="wrapper"></div>
-      {# top nav begins #}
-      {% include 'base/_items/top_nav.html' %}
-      {# top nav ends #}
+
+    <div id="wrapper">
       <input type="hidden" name="current_project" value="{{current_project.slug}}">
-      <div class="content-page">
+      <div class="content-page" role="main" aria-label="Main content">
         <div class="content">
           <div class="container-fluid">
             <div class="row">
@@ -99,11 +105,16 @@
     <script src="https://unpkg.com/tippy.js@6"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.8/purify.min.js"></script>
     <script src="{% static 'assets/js/app.min.js' %}"></script>
+    <script src="{% static 'custom/constants.js' %}"></script>
     <script src="{% static 'custom/custom.js' %}"></script>
     <script src="{% static 'custom/update.js' %}"></script>
     <script src="{% static 'custom/toolbox.js' %}"></script>
     <script src="{% static 'custom/right_sidebar.js' %}"></script>
     <script src="{% static 'custom/notification.js' %}"></script>
+    <script src="{% static 'custom/sidebar.js' %}"></script>
+    <script src="{% static 'custom/keyboard-shortcuts.js' %}"></script>
+    <script src="{% static 'custom/vuln-view-switcher.js' %}"></script>
+    <script src="{% static 'custom/scan-live-poller.js' %}"></script>
     <script src="{% static 'plugins/snackbar/snackbar.min.js' %}"></script>
     <script src="{% static 'plugins/sweetalert2/sweetalert2.all.min.js' %}"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
@@ -122,7 +133,7 @@
         $(window).on('hashchange', handleHashInUrl);
         render_search_history('{{current_project.slug}}');
 
-        // rengine will also check everyday if update exists for rengine
+        // parakang will also check everyday if update exists for parakang
         checkDailyUpdate();
 
         getScanStatusSidebar(project='{{current_project.slug}}', reload=false);
@@ -131,11 +142,21 @@
         tippy('.top-activity-counter', {
           content: 'Scan Activity',
         });
-        if (localStorage.getItem('rengine-theme') == "dark") {
-          $('#dark-mode-check').prop("checked", true).change();
-        }
-        else{
-          $('#dark-mode-check').prop("checked", false).change();
+        // Dark mode: use CSS-variable approach via data-theme attribute
+        // Override app.min.js handler that tries to swap non-existent dark stylesheets
+        $('#dark-mode-check').off('change').on('change', function() {
+          if (this.checked) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            localStorage.setItem('parakang-theme', 'dark');
+          } else {
+            document.documentElement.removeAttribute('data-theme');
+            localStorage.setItem('parakang-theme', 'light');
+          }
+        });
+        // Apply saved theme on load
+        if (localStorage.getItem('parakang-theme') === 'dark') {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          $('#dark-mode-check').prop('checked', true);
         }
         handleHashInUrl();
       });

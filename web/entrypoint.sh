@@ -14,9 +14,9 @@ mkdir -p /var/log/gunicorn
 
 # Drop privileges to non-root user if gosu is available
 # Otherwise run as current user (backwards compatible with older images)
-if command -v gosu &> /dev/null && id -u rengine &> /dev/null; then
-    chown -R rengine:rengine /var/log/gunicorn 2>/dev/null || true
-    exec gosu rengine gunicorn reNgine.wsgi:application \
+if command -v gosu &> /dev/null && id -u parakang &> /dev/null; then
+    chown -R parakang:parakang /var/log/gunicorn 2>/dev/null || true
+    exec gosu parakang gunicorn paraKang.wsgi:application \
         --bind 0.0.0.0:8000 \
         --workers "${GUNICORN_WORKERS:-4}" \
         --threads "${GUNICORN_THREADS:-2}" \
@@ -29,9 +29,9 @@ if command -v gosu &> /dev/null && id -u rengine &> /dev/null; then
         --error-logfile /var/log/gunicorn/error.log \
         --log-level info
 else
-    echo "[WARN] gosu or rengine user not found, running as $(whoami) — this is insecure for production!"
-    echo "[WARN] Install gosu and create a rengine user to run as non-root"
-    exec gunicorn reNgine.wsgi:application \
+    echo "[WARN] gosu or parakang user not found, running as $(whoami) — this is insecure for production!"
+    echo "[WARN] Install gosu and create a parakang user to run as non-root"
+    exec gunicorn paraKang.wsgi:application \
         --bind 0.0.0.0:8000 \
         --workers "${GUNICORN_WORKERS:-4}" \
         --threads "${GUNICORN_THREADS:-2}" \

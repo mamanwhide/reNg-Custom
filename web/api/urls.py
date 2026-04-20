@@ -180,9 +180,9 @@ urlpatterns = [
         OllamaManager.as_view(),
         name='ollama_manager'),
     path(
-        'rengine/update/',
-        RengineUpdateCheck.as_view(),
-        name='check_rengine_update'),
+        'parakang/update/',
+        ParaKangUpdateCheck.as_view(),
+        name='check_parakang_update'),
     path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),

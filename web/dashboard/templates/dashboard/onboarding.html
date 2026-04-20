@@ -3,7 +3,7 @@
 <html lang="en" data-layout="horizontal" data-topbar-color="dark">
   <head>
     <meta charset="utf-8" />
-    <title>reNgine Onboarding</title>
+    <title>paraKang Onboarding</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="{% static 'bootstrap/bootstrap.min.css' %}" rel="stylesheet" type="text/css" id="bootstrap-stylesheet" />
     <link href="{% static 'assets/css/app.min.css' %}" rel="stylesheet" type="text/css" id="main-stylesheet" />
@@ -45,8 +45,8 @@
           <div class="col-xl-10">
             <form method="POST" autocomplete="off"> {% csrf_token %}
               <div class="text-center mb-4">
-                <h3 class="text-white">Welcome to reNgine</h3>
-                <p class="text-muted">Let's set up your environment to get started with reNgine.</p>
+                <h3 class="text-white">Welcome to paraKang</h3>
+                <p class="text-muted">Let's set up your environment to get started with paraKang.</p>
               </div>
               {% if error %}
               <div class="alert alert-danger">
@@ -88,7 +88,7 @@
               <div class="card mb-4">
                 <div class="card-body">
                   <h5 class="card-title"><i class="fe-settings text-primary me-2"></i>User Preferences</h5>
-                  <p class="card-text text-muted">Customize your reNgine experience with these preferences.</p>
+                  <p class="card-text text-muted">Customize your paraKang experience with these preferences.</p>
                   <div class="mb-3">
                     <div class="form-check form-switch">
                       <label class="form-check-label" for="bug_bounty_mode">
@@ -111,7 +111,7 @@
               <div class="card mb-4">
                 <div class="card-body">
                   <h5 class="card-title"><i class="fe-key text-primary me-2"></i>API Keys</h5>
-                  <p class="card-text text-muted">Enter your API keys for various services to enhance reNgine's capabilities.</p>
+                  <p class="card-text text-muted">Enter your API keys for various services to enhance paraKang's capabilities.</p>
                   <div class="mb-3">
                     <label for="key_openai" class="form-label">OpenAI Key</label>
                     <input class="form-control" type="text" id="key_openai" name="key_openai" placeholder="Enter OpenAI Key" value="{{openai_key}}">

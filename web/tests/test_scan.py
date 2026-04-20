@@ -3,13 +3,13 @@ import logging
 import os
 import unittest
 
-os.environ['RENGINE_SECRET_KEY'] = 'secret'
+os.environ['PARAKANG_SECRET_KEY'] = 'secret'
 os.environ['CELERY_ALWAYS_EAGER'] = 'True'
 
 import yaml
 from celery.utils.log import get_task_logger
-from reNgine.settings import DEBUG
-from reNgine.tasks import (dir_file_fuzz, fetch_url, http_crawl, initiate_scan,
+from paraKang.settings import DEBUG
+from paraKang.tasks import (dir_file_fuzz, fetch_url, http_crawl, initiate_scan,
                            osint, port_scan, subdomain_discovery,
                            vulnerability_scan)
 from startScan.models import *
@@ -76,7 +76,7 @@ class TestOnlineScan(unittest.TestCase):
             print(url)
 
     def test_subdomain_discovery(self):
-        domain = DOMAIN_NAME.lstrip('rengine.')
+        domain = DOMAIN_NAME.lstrip('parakang.')
         subdomains = subdomain_discovery(domain, ctx=self.ctx)
         if DEBUG:
             print(json.dumps(subdomains, indent=4))

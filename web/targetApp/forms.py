@@ -1,5 +1,5 @@
 from django import forms
-from reNgine.validators import validate_domain
+from paraKang.validators import validate_domain
 
 from .models import *
 

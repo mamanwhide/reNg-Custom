@@ -1,6 +1,6 @@
 ## Contributors
 
-Thanks to these individuals for making reNgine awesome by fixing bugs, resolving issues and by creating PR!
+Thanks to these individuals for making paraKang awesome by fixing bugs, resolving issues and by creating PR!
 
 * [Aju100](https://github.com/Aju100)
 * [d1pakda5](https://github.com/d1pakda5)
@@ -13,7 +13,7 @@ Thanks to these individuals for making reNgine awesome by fixing bugs, resolving
 *If you have created a Pull request, feel free to add your name here, because we know you are awesome and deserve thanks from the community!*
 
 
-Also, Thanks to these individuals for making reNgine awesome by providing continuous suggestions and support!
+Also, Thanks to these individuals for making paraKang awesome by providing continuous suggestions and support!
 
 * [bhavsec](https://twitter.com/bhavsec)
 * [Cor3min3r](https://linkedin.com/in/cor3min3r)

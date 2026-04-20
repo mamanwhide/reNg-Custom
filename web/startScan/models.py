@@ -4,9 +4,9 @@ from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.utils import timezone
-from reNgine.definitions import (CELERY_TASK_STATUSES,
+from paraKang.definitions import (CELERY_TASK_STATUSES,
 								 NUCLEI_REVERSE_SEVERITY_MAP)
-from reNgine.utilities import *
+from paraKang.utilities import *
 from scanEngine.models import EngineType
 from targetApp.models import Domain
 

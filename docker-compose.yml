@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     networks:
-      - rengine_network
+      - parakang_network
 
   redis:
     restart: always
@@ -21,14 +21,14 @@ services:
     hostname: redis
     command: redis-server --requirepass ${REDIS_PASSWORD}
     networks:
-      - rengine_network
+      - parakang_network
 
   celery:
     build:
       context: ./web
     restart: always
     entrypoint: /usr/src/app/celery-entrypoint.sh
-    # command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
+    # command: celery -A paraKang worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
     mem_limit: 4g
     memswap_limit: 5g
     volumes:
@@ -56,13 +56,13 @@ services:
       - db
       - redis
     networks:
-      - rengine_network
+      - parakang_network
 
   celery-beat:
     build: ./web
     restart: always
     entrypoint: /usr/src/app/beat-entrypoint.sh
-    command: celery -A reNgine beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A paraKang beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
       - CELERY_BROKER=redis://:${REDIS_PASSWORD}@redis:6379/0
       - CELERY_BACKEND=redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -82,14 +82,14 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
     networks:
-      - rengine_network
+      - parakang_network
 
   web:
     build:
       context: ./web
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
-    image: docker.pkg.github.com/yogeshojha/rengine/rengine:latest
+    image: docker.pkg.github.com/yogeshojha/parakang/parakang:latest
     environment:
       - DEBUG=0
       - CELERY_BROKER=redis://:${REDIS_PASSWORD}@redis:6379/0
@@ -123,9 +123,9 @@ services:
       - celery
       - celery-beat
     networks:
-      rengine_network:
+      parakang_network:
         aliases:
-          - rengine
+          - parakang
 
   proxy:
     restart: always
@@ -142,17 +142,17 @@ services:
         condition: service_started
     secrets:
       - source: proxy.ca
-        target: /etc/nginx/certs/rengine_chain.pem
+        target: /etc/nginx/certs/parakang_chain.pem
       - source: proxy.cert
-        target: /etc/nginx/certs/rengine.pem
+        target: /etc/nginx/certs/parakang.pem
       - source: proxy.key
-        target: /etc/nginx/certs/rengine_rsa.key
+        target: /etc/nginx/certs/parakang_rsa.key
     volumes:
-      - ./config/nginx/rengine.conf:/etc/nginx/conf.d/rengine.conf:ro
+      - ./config/nginx/parakang.conf:/etc/nginx/conf.d/parakang.conf:ro
       - static_volume:/usr/src/app/staticfiles/
       - scan_results:/usr/src/scan_results
     networks:
-      - rengine_network
+      - parakang_network
   ollama:
     image: ollama/ollama
     container_name: ollama
@@ -165,10 +165,10 @@ services:
       - OLLAMA_NUM_PARALLEL=2
       - OLLAMA_HOST=http://0.0.0.0:11434
     networks:
-      - rengine_network
+      - parakang_network
 
 networks:
-  rengine_network:
+  parakang_network:
     driver: bridge
 
 volumes:
@@ -184,8 +184,8 @@ volumes:
 
 secrets:
   proxy.ca:
-    file: ./secrets/certs/rengine_chain.pem
+    file: ./secrets/certs/parakang_chain.pem
   proxy.key:
-    file: ./secrets/certs/rengine_rsa.key
+    file: ./secrets/certs/parakang_rsa.key
   proxy.cert:
-    file: ./secrets/certs/rengine.pem
+    file: ./secrets/certs/parakang.pem

@@ -1,116 +1,220 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <title>Login reNgine</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="{% static 'bootstrap/bootstrap.min.css' %}" rel="stylesheet" type="text/css" id="bootstrap-stylesheet" />
-  <link href="{% static 'assets/css/app.min.css' %}" rel="stylesheet" type="text/css" id="main-stylesheet" />
-  <link href="{% static 'bootstrap/bootstrap-dark.min.css' %}" rel="stylesheet" type="text/css" id="bootstrap-dark-stylesheet" />
-  <link href="{% static 'assets/css/app-dark.min.css' %}" rel="stylesheet" type="text/css" id="main-dark-stylesheet" />
-  <link href="{% static 'assets/css/icons.min.css' %}" rel="stylesheet" type="text/css" />
-  <style media="screen">
-    @font-face {
-      font-family: "Cerebri Sans,sans-serif";
-      src: url("{% static 'fonts/cerebrisans-light.eot' %}");
-      src: local("Cerebri-sans Light"), url("{% static 'fonts/cerebrisans-light.woff' %}") format("woff");
-      font-weight: 300; }
-
-    @font-face {
-      font-family: "Cerebri Sans,sans-serif";
-      src: url("{% static 'fonts/cerebrisans-regular.eot' %}");
-      src: local("Cerebri-sans Regular"), url("{% static 'fonts/cerebrisans-regular.woff' %}") format("woff");
-      font-weight: 400; }
-
-    @font-face {
-      font-family: "Cerebri Sans,sans-serif";
-      src: url("{% static 'fonts/cerebrisans-medium.eot' %}");
-      src: local("Cerebri-sans Medium"), url("{% static 'fonts/cerebrisans-medium.woff' %}") format("woff");
-      font-weight: 500; }
-
-    @font-face {
-      font-family: "Cerebri Sans,sans-serif";
-      src: url("{% static 'fonts/cerebrisans-semibold.eot' %}");
-      src: local("Cerebri-sans Semibold"), url("{% static 'fonts/cerebrisans-semibold.woff' %}") format("woff");
-      font-weight: 600; }
-
-    @font-face {
-      font-family: "Cerebri Sans,sans-serif";
-      src: url("{% static 'fonts/cerebrisans-bold.eot' %}");
-      src: local("Cerebri-sans Bold"), url("{% static 'fonts/cerebrisans-bold.woff' %}") format("woff");
-      font-weight: 700; }
-  </style>
+  <title>Login — paraKang</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="paraKang — Automated Reconnaissance Framework" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="{% static 'custom/login.css' %}" rel="stylesheet" type="text/css" />
 </head>
-<body class="loading authentication-bg">
-  <div class="account-pages mt-5 mb-5">
-    <div class="container">
-      <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6 col-xl-4">
-          <div class="card">
-            <div class="card-body p-4">
-              <div class="text-center w-75 m-auto">
-                <div class="auth-logo">
-                  <a href="index.html" class="logo text-center">
-                    <span class="logo-lg">
-                      <img src="/staticfiles/img/logo-lg.png" alt="" height="90">
-                    </span>
-                  </a>
-                </div>
-                <h3 class="">Login to reNgine</h3>
-                <p>Current release: v{{ RENGINE_CURRENT_VERSION }}</p>
-              </div>
-              <div class="alert alert-primary" role="alert">
-                <a href="https://rengine.wiki" target="_blank">Learn how to create reNgine account.</a>
-              </div>
-              {% if messages %}
-              <p class="">
-                  {% for message in messages %}
-                    <div class="alert alert-warning" role="alert">
-                      {{message}}
-                    </div>
-                  {% endfor %}
-              <span>If you have any issues or feature request, feel free to <a href="https://github.com/yogeshojha/rengine/issues" class="text-primary">raise issue on Github.</a></span>
-              </p>
-              {% endif %}
-              <form method="POST">
-                {% csrf_token %}
-                <div class="mb-3">
-                  <label for="username" class="form-label">Username</label>
-                  <div class="input-group">
-                    <span class="input-group-text" id="basic-addon1">@</span>
-                    <input id="username" name="username" type="text" class="form-control {% if form.errors %}is-invalid{% endif %}" placeholder="username" required>
-                  </div>
-                </div>
-                <div class="mb-3">
-                  <label for="password" class="form-label">Password</label>
-                  <div class="input-group input-group-merge">
-                    <input id="password" name="password" type="password" class="form-control {% if form.errors %}is-invalid{% endif %}" placeholder="Password" required>
-                    <div class="input-group-text" data-password="false">
-                      <span class="password-eye"></span>
-                    </div>
-                  </div>
-                </div>
-                {% if form.errors %}
-                <div class="col-12 text-danger">
-                    <p class="text-danger">
-                        <strong>Oops! Invalid username or password.</strong>
-                        <br>
-                        Please note, both password and username are case-sensitive.
-                    </p>
-                </div>
-                {% endif %}
-                <div class="text-center d-grid">
-                  <button class="btn btn-primary" type="submit"> Log In </button>
-                </div>
-              </form>
-            </div>
+<body>
+  <!-- ============================================================ -->
+  <!-- Canvas Background — Particle Network                         -->
+  <!-- ============================================================ -->
+  <canvas id="particle-canvas" aria-hidden="true"></canvas>
+
+  <!-- ============================================================ -->
+  <!-- Main Split Layout                                            -->
+  <!-- ============================================================ -->
+  <div class="login-container">
+
+    <!-- ========== LEFT PANEL — Branding & Visualization ========== -->
+    <div class="login-hero" aria-hidden="true">
+      <div class="hero-content">
+        <div class="hero-logo">
+          <img src="{% static 'img/logo-lg.png' %}" alt="" height="64" />
+        </div>
+        <h1 class="hero-title">paraKang</h1>
+        <p class="hero-subtitle">Automated Reconnaissance Framework</p>
+
+        <div class="hero-stats">
+          <div class="hero-stat">
+            <span class="hero-stat__value" data-counter="threat">—</span>
+            <span class="hero-stat__label">Threats Detected</span>
           </div>
+          <div class="hero-stat">
+            <span class="hero-stat__value" data-counter="scan">—</span>
+            <span class="hero-stat__label">Scans Completed</span>
+          </div>
+          <div class="hero-stat">
+            <span class="hero-stat__value" data-counter="target">—</span>
+            <span class="hero-stat__label">Targets Monitored</span>
+          </div>
+        </div>
+
+        <div class="hero-pulse">
+          <span class="pulse-dot"></span>
+          <span class="pulse-text">System Operational</span>
         </div>
       </div>
     </div>
+
+    <!-- ========== RIGHT PANEL — Login Form ========== -->
+    <div class="login-form-panel">
+      <div class="login-form-wrapper">
+
+        <!-- Security indicator -->
+        <div class="security-indicator" role="status" aria-label="Secure connection">
+          <svg class="si-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>Secure Connection</span>
+          <span class="si-protocol">TLS 1.3</span>
+        </div>
+
+        <!-- Logo (mobile only) -->
+        <div class="login-mobile-logo">
+          <img src="{% static 'img/logo-lg.png' %}" alt="paraKang" height="48" />
+        </div>
+
+        <!-- Heading -->
+        <div class="login-header">
+          <h2 class="login-title">Welcome back</h2>
+          <p class="login-subtitle">Sign in to your paraKang instance</p>
+        </div>
+
+        <!-- Error messages -->
+        {% if form.errors %}
+        <div class="login-alert login-alert--error" role="alert" aria-live="assertive" id="login-error">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="15" y1="9" x2="9" y2="15"></line>
+            <line x1="9" y1="9" x2="15" y2="15"></line>
+          </svg>
+          <div>
+            <strong>Invalid credentials</strong>
+            <span>Username and password are case-sensitive.</span>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if messages %}
+        {% for message in messages %}
+        <div class="login-alert login-alert--{% if message.tags == 'error' %}error{% elif message.tags == 'warning' %}warning{% else %}info{% endif %}" role="alert">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+
+        <!-- Login Form -->
+        <form method="POST" action="{% url 'login' %}" class="login-form" id="login-form" novalidate autocomplete="on">
+          {% csrf_token %}
+          {% if next %}
+          <input type="hidden" name="next" value="{{ next }}" />
+          {% endif %}
+
+          <!-- Username -->
+          <div class="form-field" data-field="username">
+            <div class="field-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            </div>
+            <input
+              id="username"
+              name="username"
+              type="text"
+              class="field-input {% if form.errors %}field-error{% endif %}"
+              placeholder=" "
+              required
+              autocomplete="username"
+              autofocus
+              aria-label="Username"
+              aria-required="true"
+              aria-describedby="{% if form.errors %}login-error{% endif %}"
+            />
+            <label for="username" class="field-label">Username</label>
+          </div>
+
+          <!-- Password -->
+          <div class="form-field" data-field="password">
+            <div class="field-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+            </div>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              class="field-input {% if form.errors %}field-error{% endif %}"
+              placeholder=" "
+              required
+              autocomplete="current-password"
+              aria-label="Password"
+              aria-required="true"
+            />
+            <label for="password" class="field-label">Password</label>
+            <button type="button" class="field-toggle-pw" aria-label="Toggle password visibility" tabindex="0">
+              <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"></path>
+                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"></path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+                <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"></path>
+              </svg>
+            </button>
+          </div>
+
+          <!-- Remember me -->
+          <div class="form-options">
+            <label class="toggle-switch" for="remember-me">
+              <input type="checkbox" id="remember-me" name="remember" tabindex="0" />
+              <span class="toggle-track" aria-hidden="true">
+                <span class="toggle-thumb"></span>
+              </span>
+              <span class="toggle-label">Remember me</span>
+            </label>
+          </div>
+
+          <!-- Submit -->
+          <button type="submit" class="login-btn" id="login-btn" aria-label="Sign in">
+            <span class="login-btn__text">Sign in</span>
+            <span class="login-btn__spinner" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"></path>
+              </svg>
+            </span>
+            <span class="login-btn__check" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </span>
+          </button>
+        </form>
+
+        <!-- Footer -->
+        <div class="login-footer">
+          <p class="login-version">paraKang v{{ PARAKANG_CURRENT_VERSION }}</p>
+          <p class="login-copyright">&copy; {% now "Y" %} paraKang. Attack Surface Management framework.</p>
+        </div>
+
+      </div>
+    </div>
+
   </div>
-  <script src="{% static 'assets/js/vendor.min.js' %}"></script>
-  <script src="{% static 'assets/js/app.min.js' %}"></script>
+
+  <!-- Live region for screen reader announcements -->
+  <div id="sr-announce" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="{% static 'custom/login_animation.js' %}"></script>
+  <script src="{% static 'custom/login.js' %}"></script>
 </body>
 </html>

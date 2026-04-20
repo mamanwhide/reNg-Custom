@@ -1,0 +1,1205 @@
+/* =============================================================================
+   paraKang Design Tokens v3.0
+   Single source of truth for ALL visual properties.
+   Loaded globally in base.html before custom.css.
+   Light mode = default :root
+   Dark mode  = [data-theme="dark"] overrides
+   ============================================================================= */
+
+
+/* =============================================================================
+   1. Core Variables — Light Mode
+   ============================================================================= */
+
+:root {
+  /* --- Spacing Scale --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* --- Typography Scale --- */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* --- Border Radius --- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* --- Transitions --- */
+  --transition-fast: 150ms ease;
+  --transition-base: 300ms ease;
+  --transition-slow: 500ms ease;
+
+  /* --- Page Surfaces --- */
+  --rn-bg-body: #eef1f6;
+  --rn-bg-content: #eef1f6;
+  --rn-bg-card: #ffffff;
+  --rn-bg-card-hover: #f5f7fb;
+  --rn-bg-elevated: #f8f9fc;
+  --rn-bg-input: #ffffff;
+  --rn-bg-input-disabled: #e9ecef;
+
+  /* --- Navbar & Header --- */
+  --rn-bg-navbar: #ffffff;
+  --rn-border-navbar: #e2e6ed;
+  --rn-navbar-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+
+  /* --- Text --- */
+  --rn-text-primary: #1a2332;
+  --rn-text-secondary: #546e7a;
+  --rn-text-muted: #90a4ae;
+  --rn-text-heading: #263238;
+  --rn-text-link: #3283f6;
+  --rn-text-link-hover: #1a6ddb;
+  --rn-text-nav: #6c757d;
+  --rn-text-nav-active: #3283f6;
+
+  /* --- Borders --- */
+  --rn-border: #e2e6ed;
+  --rn-border-strong: #d1d5db;
+  --rn-border-input: #ced4da;
+  --rn-border-focus: #3283f6;
+
+  /* --- Shadows --- */
+  --rn-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --rn-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+  --rn-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+  --rn-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.12);
+
+  /* --- Accent Color --- */
+  --rn-accent: #3283f6;
+  --rn-accent-hover: #1a6ddb;
+  --rn-accent-subtle: rgba(50, 131, 246, 0.08);
+  --rn-accent-rgb: 50, 131, 246;
+
+  /* --- Additional Accent --- */
+  --rn-cyan: #0084b4;
+  --rn-green: #00a854;
+  --rn-purple: #6c3ec7;
+  --rn-orange: #e85d26;
+
+  /* --- Severity Colors --- */
+  --rn-critical: #d32f2f;
+  --rn-critical-bg: rgba(211, 47, 47, 0.08);
+  --rn-high: #e53935;
+  --rn-high-bg: rgba(229, 57, 53, 0.08);
+  --rn-medium: #f9a825;
+  --rn-medium-bg: rgba(249, 168, 37, 0.08);
+  --rn-low: #2e7d32;
+  --rn-low-bg: rgba(46, 125, 50, 0.08);
+  --rn-info-sev: #1565c0;
+  --rn-info-sev-bg: rgba(21, 101, 192, 0.08);
+  --rn-unknown: #78909c;
+  --rn-unknown-bg: rgba(120, 144, 156, 0.08);
+
+  /* --- Status Colors --- */
+  --rn-status-success: #2e7d32;
+  --rn-status-success-bg: rgba(46, 125, 50, 0.08);
+  --rn-status-warning: #f9a825;
+  --rn-status-warning-bg: rgba(249, 168, 37, 0.08);
+  --rn-status-error: #d32f2f;
+  --rn-status-error-bg: rgba(211, 47, 47, 0.08);
+  --rn-status-pending: #546e7a;
+  --rn-status-pending-bg: rgba(84, 110, 122, 0.08);
+  --rn-status-running: #3283f6;
+  --rn-status-running-bg: rgba(50, 131, 246, 0.08);
+
+  /* --- Component Tokens --- */
+  --rn-table-header-bg: #f0f3f8;
+  --rn-table-stripe: rgba(0, 0, 0, 0.015);
+  --rn-table-hover: rgba(50, 131, 246, 0.04);
+  --rn-dropdown-bg: #ffffff;
+  --rn-dropdown-hover: #f5f7fb;
+  --rn-modal-bg: #ffffff;
+  --rn-code-bg: #f0f3f8;
+  --rn-scrollbar-thumb: #c1c1c1;
+  --rn-tooltip-bg: #263238;
+  --rn-tooltip-color: #ffffff;
+  --rn-tab-active-border: #3283f6;
+
+  /* --- Notification Panel --- */
+  --rn-notif-bg: #ffffff;
+  --rn-notif-unread: #f3f4f6;
+  --rn-notif-icon-bg: #e5e7eb;
+  --rn-notif-desc: #4b5563;
+  --rn-notif-time: #6b7280;
+
+  /* --- Radius / Transition shortcuts --- */
+  --rn-radius: 8px;
+  --rn-radius-lg: 12px;
+  --rn-transition: 0.3s ease;
+}
+
+
+/* =============================================================================
+   2. Dark Mode Overrides
+   ============================================================================= */
+
+[data-theme="dark"] {
+  /* --- Page Surfaces --- */
+  --rn-bg-body: #0a1628;
+  --rn-bg-content: #0a1628;
+  --rn-bg-card: #0d1f3c;
+  --rn-bg-card-hover: #132844;
+  --rn-bg-elevated: #132844;
+  --rn-bg-input: #132844;
+  --rn-bg-input-disabled: #1a3358;
+
+  /* --- Navbar & Header --- */
+  --rn-bg-navbar: #07121f;
+  --rn-border-navbar: rgba(0, 212, 255, 0.1);
+  --rn-navbar-shadow: 0 1px 8px rgba(0, 0, 0, 0.3);
+
+  /* --- Text --- */
+  --rn-text-primary: #e0e6f0;
+  --rn-text-secondary: #8899b4;
+  --rn-text-muted: #546b8a;
+  --rn-text-heading: #e8edf5;
+  --rn-text-link: #00d4ff;
+  --rn-text-link-hover: #33ddff;
+  --rn-text-nav: #8899b4;
+  --rn-text-nav-active: #00d4ff;
+
+  /* --- Borders --- */
+  --rn-border: rgba(255, 255, 255, 0.06);
+  --rn-border-strong: rgba(255, 255, 255, 0.1);
+  --rn-border-input: rgba(255, 255, 255, 0.1);
+  --rn-border-focus: #00d4ff;
+
+  /* --- Shadows --- */
+  --rn-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --rn-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --rn-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --rn-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.5);
+
+  /* --- Accent Color --- */
+  --rn-accent: #00d4ff;
+  --rn-accent-hover: #33ddff;
+  --rn-accent-subtle: rgba(0, 212, 255, 0.12);
+  --rn-accent-rgb: 0, 212, 255;
+
+  /* --- Additional Accent --- */
+  --rn-cyan: #00d4ff;
+  --rn-green: #00e676;
+  --rn-purple: #7c4dff;
+  --rn-orange: #ff6b35;
+
+  /* --- Severity Colors --- */
+  --rn-critical: #ff1744;
+  --rn-critical-bg: rgba(255, 23, 68, 0.15);
+  --rn-high: #ff5252;
+  --rn-high-bg: rgba(255, 82, 82, 0.15);
+  --rn-medium: #ffab00;
+  --rn-medium-bg: rgba(255, 171, 0, 0.15);
+  --rn-low: #00e676;
+  --rn-low-bg: rgba(0, 230, 118, 0.15);
+  --rn-info-sev: #2979ff;
+  --rn-info-sev-bg: rgba(41, 121, 255, 0.15);
+
+  /* --- Status Colors --- */
+  --rn-status-success: #00e676;
+  --rn-status-success-bg: rgba(0, 230, 118, 0.12);
+  --rn-status-warning: #ffab00;
+  --rn-status-warning-bg: rgba(255, 171, 0, 0.12);
+  --rn-status-error: #ff1744;
+  --rn-status-error-bg: rgba(255, 23, 68, 0.12);
+  --rn-status-pending: #8899b4;
+  --rn-status-pending-bg: rgba(136, 153, 180, 0.12);
+  --rn-status-running: #00d4ff;
+  --rn-status-running-bg: rgba(0, 212, 255, 0.12);
+
+  /* --- Component Tokens --- */
+  --rn-table-header-bg: #132844;
+  --rn-table-stripe: rgba(255, 255, 255, 0.01);
+  --rn-table-hover: rgba(0, 212, 255, 0.06);
+  --rn-dropdown-bg: #0d1f3c;
+  --rn-dropdown-hover: #132844;
+  --rn-modal-bg: #0d1f3c;
+  --rn-code-bg: #132844;
+  --rn-scrollbar-thumb: #1a3358;
+  --rn-tooltip-bg: #132844;
+  --rn-tooltip-color: #e0e6f0;
+  --rn-tab-active-border: #00d4ff;
+
+  /* --- Notification Panel --- */
+  --rn-notif-bg: #0d1f3c;
+  --rn-notif-unread: #132844;
+  --rn-notif-icon-bg: #1a3358;
+  --rn-notif-desc: #8899b4;
+  --rn-notif-time: #546b8a;
+}
+
+
+/* =============================================================================
+   3. Global Body Application
+   ============================================================================= */
+
+body {
+  background-color: var(--rn-bg-body);
+  color: var(--rn-text-primary);
+}
+
+
+/* =============================================================================
+   4. Badge System — Unified (.rn-badge)
+   Replaces: .badge-soft-*, .badge-critical, .badge-low, .badge-pills
+   Usage:  <span class="rn-badge rn-badge--critical">Critical</span>
+   ============================================================================= */
+
+.rn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 500;
+  line-height: 1.4;
+  border-radius: var(--radius-sm, 6px);
+  white-space: nowrap;
+}
+
+/* Severity badges */
+.rn-badge--critical {
+  color: var(--rn-critical);
+  background-color: var(--rn-critical-bg);
+}
+
+.rn-badge--high {
+  color: var(--rn-high);
+  background-color: var(--rn-high-bg);
+}
+
+.rn-badge--medium {
+  color: var(--rn-medium);
+  background-color: var(--rn-medium-bg);
+}
+
+.rn-badge--low {
+  color: var(--rn-low);
+  background-color: var(--rn-low-bg);
+}
+
+.rn-badge--info {
+  color: var(--rn-info-sev);
+  background-color: var(--rn-info-sev-bg);
+}
+
+.rn-badge--unknown {
+  color: var(--rn-unknown);
+  background-color: var(--rn-unknown-bg);
+}
+
+/* Status badges */
+.rn-badge--success {
+  color: var(--rn-status-success);
+  background-color: var(--rn-status-success-bg);
+}
+
+.rn-badge--warning {
+  color: var(--rn-status-warning);
+  background-color: var(--rn-status-warning-bg);
+}
+
+.rn-badge--error {
+  color: var(--rn-status-error);
+  background-color: var(--rn-status-error-bg);
+}
+
+.rn-badge--pending {
+  color: var(--rn-status-pending);
+  background-color: var(--rn-status-pending-bg);
+}
+
+.rn-badge--running {
+  color: var(--rn-status-running);
+  background-color: var(--rn-status-running-bg);
+}
+
+/* Pill variant */
+.rn-badge--pill {
+  border-radius: var(--radius-full, 9999px);
+  padding: 2px 10px;
+}
+
+/* Dot indicator */
+.rn-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+  flex-shrink: 0;
+}
+
+
+/* =============================================================================
+   5. Legacy badge-soft compatibility
+   Maps old badge-soft-* classes to new --rn-* tokens.
+   Remove once all templates migrate to .rn-badge.
+   ============================================================================= */
+
+.badge-soft-danger,
+.badge.bg-soft-danger {
+  color: var(--rn-high) !important;
+  background-color: var(--rn-high-bg) !important;
+}
+
+.badge-soft-warning,
+.badge.bg-soft-warning {
+  color: var(--rn-medium) !important;
+  background-color: var(--rn-medium-bg) !important;
+}
+
+.badge-soft-success,
+.badge.bg-soft-success {
+  color: var(--rn-low) !important;
+  background-color: var(--rn-low-bg) !important;
+}
+
+.badge-soft-info,
+.badge.bg-soft-info {
+  color: var(--rn-info-sev) !important;
+  background-color: var(--rn-info-sev-bg) !important;
+}
+
+.badge-soft-primary,
+.badge.bg-soft-primary {
+  color: var(--rn-accent) !important;
+  background-color: var(--rn-accent-subtle) !important;
+}
+
+.badge-soft-secondary {
+  color: var(--rn-text-secondary) !important;
+  background-color: rgba(84, 110, 122, 0.08) !important;
+}
+
+.badge-soft-pink {
+  color: #e91e63 !important;
+  background-color: rgba(233, 30, 99, 0.08) !important;
+}
+
+/* Override old hardcoded badge-critical / badge-low */
+.badge-critical {
+  color: var(--rn-critical) !important;
+  background-color: var(--rn-critical-bg) !important;
+}
+
+.badge-low {
+  color: var(--rn-medium) !important;
+  background-color: var(--rn-medium-bg) !important;
+}
+
+
+/* =============================================================================
+   6. Card Component — Unified (.rn-card)
+   Replaces duplication between .card (Bootstrap) and .soc-card (custom).
+   Usage: <div class="rn-card">...</div>
+   ============================================================================= */
+
+.rn-card {
+  background-color: var(--rn-bg-card);
+  border: 1px solid var(--rn-border);
+  border-radius: var(--rn-radius-lg);
+  box-shadow: var(--rn-shadow-sm);
+  transition: box-shadow var(--transition-base), transform var(--transition-base), border-color var(--transition-base);
+}
+
+.rn-card:hover {
+  box-shadow: var(--rn-shadow);
+  border-color: var(--rn-border-strong);
+}
+
+.rn-card__header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--rn-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rn-card__title {
+  font-size: var(--text-base, 1rem);
+  font-weight: 600;
+  color: var(--rn-text-heading);
+  margin: 0;
+}
+
+.rn-card__body {
+  padding: 20px;
+}
+
+.rn-card__footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--rn-border);
+}
+
+/* Metric card variant */
+.rn-card--metric {
+  text-align: center;
+  padding: 20px;
+}
+
+.rn-card--metric:hover {
+  transform: translateY(-2px);
+}
+
+
+/* =============================================================================
+   7. Empty State Component
+   Usage: shown when no data available
+   ============================================================================= */
+
+.rn-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--rn-text-muted);
+}
+
+.rn-empty-state__icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.rn-empty-state__title {
+  font-size: var(--text-lg, 1.125rem);
+  font-weight: 600;
+  color: var(--rn-text-secondary);
+  margin-bottom: 8px;
+}
+
+.rn-empty-state__text {
+  font-size: var(--text-sm, 0.875rem);
+  max-width: 400px;
+  margin-bottom: 16px;
+}
+
+
+/* =============================================================================
+   8. Button Component (.rn-btn)
+   Usage: <button class="rn-btn rn-btn--primary">Label</button>
+   ============================================================================= */
+
+.rn-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms ease);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.rn-btn:focus-visible {
+  outline: 2px solid var(--rn-accent);
+  outline-offset: 2px;
+}
+
+.rn-btn--primary {
+  background-color: var(--rn-accent);
+  color: #ffffff;
+  border-color: var(--rn-accent);
+}
+
+.rn-btn--primary:hover {
+  background-color: var(--rn-accent-hover);
+  border-color: var(--rn-accent-hover);
+}
+
+.rn-btn--secondary {
+  background-color: transparent;
+  color: var(--rn-text-secondary);
+  border-color: var(--rn-border);
+}
+
+.rn-btn--secondary:hover {
+  background-color: var(--rn-bg-card-hover);
+  color: var(--rn-text-primary);
+  border-color: var(--rn-border-strong);
+}
+
+.rn-btn--danger {
+  background-color: var(--rn-critical);
+  color: #ffffff;
+  border-color: var(--rn-critical);
+}
+
+.rn-btn--danger:hover {
+  opacity: 0.9;
+}
+
+.rn-btn--ghost {
+  background: transparent;
+  color: var(--rn-text-secondary);
+  border-color: transparent;
+  padding: 6px 10px;
+}
+
+.rn-btn--ghost:hover {
+  background-color: var(--rn-bg-card-hover);
+  color: var(--rn-text-primary);
+}
+
+.rn-btn--sm {
+  padding: 4px 10px;
+  font-size: var(--text-xs, 0.75rem);
+}
+
+.rn-btn--lg {
+  padding: 12px 24px;
+  font-size: var(--text-base, 1rem);
+}
+
+.rn-btn[disabled],
+.rn-btn--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+
+/* =============================================================================
+   9. Form Components (.rn-form-group, .rn-input, .rn-select)
+   ============================================================================= */
+
+.rn-form-group {
+  margin-bottom: 16px;
+}
+
+.rn-form-label {
+  display: block;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--rn-text-primary);
+  margin-bottom: 6px;
+}
+
+.rn-input {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--rn-text-primary);
+  background-color: var(--rn-bg-input);
+  border: 1px solid var(--rn-border-input);
+  border-radius: var(--radius-md, 8px);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.rn-input:focus {
+  border-color: var(--rn-border-focus, var(--rn-accent));
+  box-shadow: 0 0 0 3px var(--rn-accent-subtle);
+  outline: none;
+}
+
+.rn-input::placeholder {
+  color: var(--rn-text-muted);
+}
+
+.rn-input[disabled],
+.rn-input[readonly] {
+  background-color: var(--rn-bg-input-disabled);
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Textarea variant */
+.rn-input--textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Select2 integration wrapper */
+.rn-select .select2-container--default .select2-selection--single {
+  border: 1px solid var(--rn-border-input);
+  border-radius: var(--radius-md, 8px);
+  height: 38px;
+  background-color: var(--rn-bg-input);
+}
+
+.rn-select .select2-container--default .select2-selection--single .select2-selection__rendered {
+  color: var(--rn-text-primary);
+  line-height: 36px;
+  padding-left: 12px;
+}
+
+.rn-select .select2-container--default.select2-container--focus .select2-selection--single {
+  border-color: var(--rn-border-focus, var(--rn-accent));
+  box-shadow: 0 0 0 3px var(--rn-accent-subtle);
+}
+
+/* Form help text */
+.rn-form-help {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--rn-text-muted);
+  margin-top: 4px;
+}
+
+.rn-form-error {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--rn-critical);
+  margin-top: 4px;
+}
+
+
+/* =============================================================================
+   10. Table Component (.rn-table)
+   Wrapper for DataTables with design-token theming
+   ============================================================================= */
+
+.rn-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.rn-table thead th {
+  background-color: var(--rn-table-header-bg);
+  color: var(--rn-text-heading);
+  font-weight: 600;
+  font-size: var(--text-xs, 0.75rem);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--rn-border);
+  white-space: nowrap;
+}
+
+.rn-table tbody td {
+  padding: 10px 12px;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--rn-text-primary);
+  border-bottom: 1px solid var(--rn-border);
+  vertical-align: middle;
+}
+
+.rn-table tbody tr:hover {
+  background-color: var(--rn-table-hover);
+}
+
+.rn-table tbody tr:nth-child(even) {
+  background-color: var(--rn-table-stripe);
+}
+
+/* Severity row highlights */
+.rn-table tbody tr[data-severity="critical"] {
+  border-left: 3px solid var(--rn-critical);
+}
+
+.rn-table tbody tr[data-severity="high"] {
+  border-left: 3px solid var(--rn-high);
+}
+
+.rn-table tbody tr[data-severity="medium"] {
+  border-left: 3px solid var(--rn-medium);
+}
+
+
+/* =============================================================================
+   11. Alert Component (.rn-alert)
+   Usage: <div class="rn-alert rn-alert--warning">Message</div>
+   ============================================================================= */
+
+.rn-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-sm, 0.875rem);
+  border: 1px solid;
+}
+
+.rn-alert__icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.rn-alert--success {
+  color: var(--rn-status-success);
+  background-color: var(--rn-status-success-bg);
+  border-color: var(--rn-status-success);
+}
+
+.rn-alert--warning {
+  color: var(--rn-status-warning);
+  background-color: var(--rn-status-warning-bg);
+  border-color: var(--rn-status-warning);
+}
+
+.rn-alert--error {
+  color: var(--rn-status-error);
+  background-color: var(--rn-status-error-bg);
+  border-color: var(--rn-status-error);
+}
+
+.rn-alert--info {
+  color: var(--rn-info-sev);
+  background-color: var(--rn-info-sev-bg);
+  border-color: var(--rn-info-sev);
+}
+
+
+/* =============================================================================
+   12. View Switcher Component
+   Usage: toggle between Table / Graph / Timeline / Board views
+   ============================================================================= */
+
+.rn-view-switcher {
+  display: inline-flex;
+  background: var(--rn-bg-elevated);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--rn-border);
+  overflow: hidden;
+}
+
+.rn-view-switcher__btn {
+  padding: 6px 14px;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--rn-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rn-view-switcher__btn:hover {
+  color: var(--rn-text-primary);
+  background: var(--rn-bg-card-hover);
+}
+
+.rn-view-switcher__btn.active {
+  color: var(--rn-accent);
+  background: var(--rn-accent-subtle);
+  font-weight: 600;
+}
+
+.rn-view-switcher__btn + .rn-view-switcher__btn {
+  border-left: 1px solid var(--rn-border);
+}
+
+
+/* =============================================================================
+   13. Filter Panel Component
+   OpenCTI-inspired faceted filter sidebar
+   ============================================================================= */
+
+.rn-filter-panel {
+  width: 240px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--rn-border);
+  background: var(--rn-bg-card);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.rn-filter-panel__section {
+  margin-bottom: 20px;
+}
+
+.rn-filter-panel__title {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rn-text-muted);
+  margin-bottom: 8px;
+}
+
+.rn-filter-panel__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--rn-text-primary);
+  cursor: pointer;
+}
+
+.rn-filter-panel__item:hover {
+  color: var(--rn-accent);
+}
+
+.rn-filter-panel__count {
+  margin-left: auto;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--rn-text-muted);
+  background: var(--rn-bg-elevated);
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+}
+
+/* Toggle for mobile */
+.rn-filter-toggle {
+  display: none;
+}
+
+@media (max-width: 991.98px) {
+  .rn-filter-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 1050;
+    transform: translateX(-100%);
+    transition: transform var(--transition-base);
+    box-shadow: var(--rn-shadow-lg);
+  }
+
+  .rn-filter-panel.open {
+    transform: translateX(0);
+  }
+
+  .rn-filter-toggle {
+    display: inline-flex;
+  }
+}
+
+
+/* =============================================================================
+   14. Scan Progress Component
+   Real-time scan pipeline display
+   ============================================================================= */
+
+.rn-scan-progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.rn-scan-progress__label {
+  font-size: var(--text-sm, 0.875rem);
+  color: var(--rn-text-primary);
+  min-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rn-scan-progress__bar {
+  flex: 1;
+  height: 6px;
+  background: var(--rn-bg-elevated);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.rn-scan-progress__fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--rn-accent), var(--rn-cyan, #0084b4));
+  border-radius: var(--radius-full);
+  transition: width 0.5s ease;
+}
+
+.rn-scan-progress__percent {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--rn-text-secondary);
+  min-width: 36px;
+  text-align: right;
+}
+
+
+/* =============================================================================
+   15. Metric Card Component (Dashboard)
+   ============================================================================= */
+
+.rn-metric {
+  background: var(--rn-bg-card);
+  border: 1px solid var(--rn-border);
+  border-radius: var(--rn-radius-lg);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.rn-metric:hover {
+  box-shadow: var(--rn-shadow);
+  transform: translateY(-2px);
+}
+
+.rn-metric__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.rn-metric__label {
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--rn-text-muted);
+}
+
+.rn-metric__icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  font-size: 1.125rem;
+}
+
+.rn-metric__icon--targets {
+  background: rgba(50, 131, 246, 0.1);
+  color: var(--rn-accent);
+}
+
+.rn-metric__icon--vulns {
+  background: var(--rn-critical-bg);
+  color: var(--rn-critical);
+}
+
+.rn-metric__icon--scans {
+  background: rgba(0, 168, 84, 0.1);
+  color: var(--rn-green, #00a854);
+}
+
+.rn-metric__icon--assets {
+  background: rgba(108, 62, 199, 0.1);
+  color: var(--rn-purple, #6c3ec7);
+}
+
+.rn-metric__value {
+  font-size: var(--text-3xl, 1.875rem);
+  font-weight: 700;
+  color: var(--rn-text-heading);
+  line-height: 1.2;
+}
+
+.rn-metric__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs, 0.75rem);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.rn-metric__trend--up {
+  color: var(--rn-status-success);
+}
+
+.rn-metric__trend--down {
+  color: var(--rn-critical);
+}
+
+.rn-metric__sparkline {
+  margin-top: 12px;
+  height: 40px;
+}
+
+
+/* =============================================================================
+   16. Severity Strip (Dashboard)
+   Horizontal stacked bar showing severity distribution
+   ============================================================================= */
+
+.rn-severity-strip {
+  display: flex;
+  height: 8px;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  background: var(--rn-bg-elevated);
+}
+
+.rn-severity-strip__segment {
+  height: 100%;
+  transition: width 0.5s ease;
+}
+
+.rn-severity-strip__segment--critical { background: var(--rn-critical); }
+.rn-severity-strip__segment--high     { background: var(--rn-high); }
+.rn-severity-strip__segment--medium   { background: var(--rn-medium); }
+.rn-severity-strip__segment--low      { background: var(--rn-low); }
+.rn-severity-strip__segment--info     { background: var(--rn-info-sev); }
+.rn-severity-strip__segment--unknown  { background: var(--rn-unknown); }
+
+.rn-severity-strip__labels {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.rn-severity-strip__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--rn-text-secondary);
+}
+
+.rn-severity-strip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+
+/* =============================================================================
+   17. Feed Component (Dashboard)
+   ============================================================================= */
+
+.rn-feed {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.rn-feed-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rn-border);
+  transition: background var(--transition-fast);
+}
+
+.rn-feed-item:last-child {
+  border-bottom: none;
+}
+
+.rn-feed-item:hover {
+  background: var(--rn-bg-card-hover);
+  margin: 0 -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.rn-feed-item__indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.rn-feed-item__indicator--critical { background: var(--rn-critical); }
+.rn-feed-item__indicator--high     { background: var(--rn-high); }
+.rn-feed-item__indicator--medium   { background: var(--rn-medium); }
+.rn-feed-item__indicator--low      { background: var(--rn-low); }
+.rn-feed-item__indicator--info     { background: var(--rn-info-sev); }
+.rn-feed-item__indicator--success  { background: var(--rn-status-success); }
+
+.rn-feed-item__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.rn-feed-item__title {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  color: var(--rn-text-primary);
+  margin-bottom: 2px;
+}
+
+.rn-feed-item__meta {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--rn-text-muted);
+}
+
+.rn-feed-item__action {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+
+/* =============================================================================
+   18. Scan Tab Grouping (.rn-scan-tabs)
+   Progressive disclosure: groups tabs into Overview / Assets / Findings
+   ============================================================================= */
+
+.rn-scan-tabs {
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.rn-tab-group-label {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px 4px 6px;
+  pointer-events: none;
+  list-style: none;
+}
+
+.rn-tab-group-label span {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rn-text-muted);
+  white-space: nowrap;
+  border-left: 2px solid var(--rn-border);
+  padding-left: 8px;
+}
+
+/* Hide separator on first label */
+.rn-scan-tabs .rn-tab-group-label:first-child span {
+  border-left: none;
+  padding-left: 0;
+}
+
+.rn-scan-tabs .nav-link {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rn-scan-tabs .nav-link i {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.rn-scan-tabs .nav-link.active i {
+  opacity: 1;
+}
+
+@media (max-width: 767.98px) {
+  .rn-tab-group-label {
+    width: 100%;
+    padding: 6px 0 2px;
+  }
+
+  .rn-tab-group-label span {
+    border-left: none;
+    padding-left: 0;
+    border-bottom: 1px solid var(--rn-border);
+    width: 100%;
+    padding-bottom: 4px;
+  }
+}

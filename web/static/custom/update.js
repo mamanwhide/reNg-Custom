@@ -1,37 +1,37 @@
-// all the functions related to reNgine update, including showing up modal, notification etc will be here
+// all the functions related to paraKang update, including showing up modal, notification etc will be here
 
 // Source : https://stackoverflow.com/a/32428268
 function checkDailyUpdate() {
   if (!hasOneDayPassed()) return false;
   console.log("Checking Daily Update...");
-  fetch("/api/rengine/update/")
+  fetch("/api/parakang/update/")
     .then((response) => response.json())
     .then(function (response) {
       if (response["update_available"]) {
         window.localStorage.setItem("update_available", true);
-        $(".rengine_update_available").show();
+        $(".parakang_update_available").show();
         update_available(response["latest_version"], response["changelog"]);
       } else {
         window.localStorage.setItem("update_available", false);
-        $(".rengine_update_available").hide();
+        $(".parakang_update_available").hide();
       }
     });
 }
 
-function check_rengine_update() {
+function check_parakang_update() {
   if (
     window.localStorage.getItem("update_available") &&
     window.localStorage.getItem("update_available") === "true"
   ) {
     // redirect to github release page
-    window.open("https://github.com/yogeshojha/rengine/releases", "_blank");
+    window.open("https://github.com/yogeshojha/parakang/releases", "_blank");
   } else {
     Swal.fire({
-      title: "Checking reNgine latest version...",
+      title: "Checking paraKang latest version...",
       allowOutsideClick: false,
     });
     swal.showLoading();
-    fetch("/api/rengine/update/")
+    fetch("/api/parakang/update/")
       .then((response) => response.json())
       .then(function (response) {
         console.log(response);
@@ -43,17 +43,17 @@ function check_rengine_update() {
             icon: "error",
           });
           window.localStorage.setItem("update_available", false);
-          $(".rengine_update_available").hide();
+          $(".parakang_update_available").hide();
         } else if (response["update_available"]) {
           window.localStorage.setItem("update_available", true);
-          $(".rengine_update_available").show();
+          $(".parakang_update_available").show();
           update_available(response["latest_version"], response["changelog"]);
         } else {
           window.localStorage.setItem("update_available", false);
-          $(".rengine_update_available").hide();
+          $(".parakang_update_available").hide();
           Swal.fire({
             title: "Update not available",
-            text: "You are running the latest version of reNgine!",
+            text: "You are running the latest version of paraKang!",
             icon: "info",
           });
         }
@@ -114,7 +114,7 @@ function update_available(latest_version_number, changelog) {
       title: "Update Available!",
       html: `
           ${changelogStyle}
-          <h5>reNgine's new update ${latest_version_number} is available, please follow the update instructions.</h5>
+          <h5>paraKang's new update ${latest_version_number} is available, please follow the update instructions.</h5>
           <div class="changelog-content" style="max-height: 500px;" data-simplebar>
             ${parsedChangelog}
           </div>
@@ -131,7 +131,7 @@ function update_available(latest_version_number, changelog) {
       },
     }).then((result) => {
       if (result.isConfirmed) {
-        window.open("https://www.rengine.wiki/update", "_blank");
+        window.open("https://www.parakang.wiki/update", "_blank");
       }
     });
   });
@@ -149,14 +149,14 @@ function hasOneDayPassed() {
 
 function showAfterUpdatePopup() {
   // this function will show a popup after the update is done to tell user about the new features
-  const currentVersion = document.body.getAttribute("data-rengine-version");
+  const currentVersion = document.body.getAttribute("data-parakang-version");
   const lastShownVersion = localStorage.getItem("lastShownUpdateVersion");
 
   if (lastShownVersion !== currentVersion) {
     // const isFirstRun = lastShownVersion === null;
     // we will use this once videos are made for features
     // Swal.fire({
-    //   title: isFirstRun ? "Welcome to reNgine!" : "Thanks for updating!",
+    //   title: isFirstRun ? "Welcome to paraKang!" : "Thanks for updating!",
     //   text: `Would you like to see ${
     //     isFirstRun ? "the features" : "what's changed"
     //   } in this version?`,
@@ -166,12 +166,12 @@ function showAfterUpdatePopup() {
     //   cancelButtonText: "No, thanks",
     // }).then((result) => {
     //   if (result.isConfirmed) {
-    //     window.open("https://rengine.wiki/changelog/latest", "_blank");
+    //     window.open("https://parakang.wiki/changelog/latest", "_blank");
     //   }
     //   localStorage.setItem("lastShownUpdateVersion", currentVersion);
     // });
     Swal.fire({
-      title: "Thanks for using reNgine!",
+      title: "Thanks for using paraKang!",
       text: `Would you like to see what's new in this version?`,
       icon: "info",
       showCancelButton: true,
@@ -179,7 +179,7 @@ function showAfterUpdatePopup() {
       cancelButtonText: "No, thanks",
     }).then((result) => {
       if (result.isConfirmed) {
-        window.open(`https://rengine.wiki/whats-new/${currentVersion.replace(/\./g, "_")}`, "_blank");
+        window.open(`https://parakang.wiki/whats-new/${currentVersion.replace(/\./g, "_")}`, "_blank");
       }
       localStorage.setItem("lastShownUpdateVersion", currentVersion);
     });
@@ -194,8 +194,8 @@ $(document).ready(function () {
     window.localStorage.getItem("update_available") &&
     window.localStorage.getItem("update_available") === "true"
   ) {
-    $(".rengine_update_available").show();
+    $(".parakang_update_available").show();
   } else {
-    $(".rengine_update_available").hide();
+    $(".parakang_update_available").hide();
   }
 });

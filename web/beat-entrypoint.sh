@@ -8,7 +8,7 @@ pip3 install --quiet --upgrade 'tenacity>=8.2.3,!=8.4.0,<9.0.0' 2>/dev/null || t
 echo "Waiting for database migrations to be applied by web container..."
 until python3 -c "
 import django, sys, os
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'paraKang.settings')
 django.setup()
 from django.db import connection
 cursor = connection.cursor()

@@ -1,10 +1,10 @@
 # include all the celery tasks to be used in the API, do not put in tasks.py
 import requests
 
-from reNgine.common_func import create_inappnotification, get_hackerone_key_username
-from reNgine.definitions import PROJECT_LEVEL_NOTIFICATION, HACKERONE_ALLOWED_ASSET_TYPES
-from reNgine.celery import app
-from reNgine.database_utils import bulk_import_targets
+from paraKang.common_func import create_inappnotification, get_hackerone_key_username
+from paraKang.definitions import PROJECT_LEVEL_NOTIFICATION, HACKERONE_ALLOWED_ASSET_TYPES
+from paraKang.celery import app
+from paraKang.database_utils import bulk_import_targets
 
 @app.task(name='import_hackerone_programs_task', bind=False, queue='api_queue')
 def import_hackerone_programs_task(handles, project_slug, is_sync = False):
@@ -47,7 +47,7 @@ def import_hackerone_programs_task(handles, project_slug, is_sync = False):
 		program_details = fetch_program_details_from_hackerone(handle)
 		if program_details:
 			# Thanks, some parts of this logics were originally written by @null-ref-0000
-			# via PR https://github.com/yogeshojha/rengine/pull/1410
+			# via PR https://github.com/yogeshojha/parakang/pull/1410
 			try:
 				program_name = program_details['attributes']['name']
 
@@ -61,7 +61,7 @@ def import_hackerone_programs_task(handles, project_slug, is_sync = False):
 					# for now we should ignore the scope that are not eligible for submission
 					# in future release we will add this in target out_of_scope
 
-					# we need to filter the scope that are supported by reNgine now
+					# we need to filter the scope that are supported by paraKang now
 					if asset_type in HACKERONE_ALLOWED_ASSET_TYPES and eligible_for_submission:
 						assets.append(asset_identifier)
 					
