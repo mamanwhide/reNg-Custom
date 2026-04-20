@@ -12,8 +12,19 @@ body[data-layout-mode=horizontal] .container-fluid {
 
 /* Increase navbar height */
 .navbar {
-  min-height: 70px !important;
+  min-height: 80px !important;
   padding: 0.75rem 1rem !important;
+  position: relative;
+  z-index: 1020;
+}
+
+/* Add top margin to prevent content cutoff */
+body {
+  padding-top: 80px !important;
+}
+
+.content-page {
+  margin-top: 0;
 }
 
 .navbar-brand {
