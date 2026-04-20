@@ -442,8 +442,11 @@ body.rn-sidebar-layout.sidebar-collapsed .rn-header {
 .rn-header__left {
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: flex-start;
+  gap: 12px;
   flex: 1;
+  padding-left: 8px;
+  height: 100%;
 }
 
 .rn-header__right {
@@ -468,16 +471,18 @@ body.rn-sidebar-layout.sidebar-collapsed .rn-header {
 
 /* Search bar inside header */
 .rn-header .app-search {
-  height: var(--header-height);
+  height: 100%;
   display: flex;
   align-items: center;
+  justify-content: center;
   max-width: 320px;
+  margin-left: 8px;
 }
 
 .rn-header .app-search .form-control {
   border: 1px solid var(--rn-border-navbar, #e2e6ed);
-  height: 36px;
-  padding-left: 16px;
+  height: 40px;
+  padding-left: 12px;
   padding-right: 0;
   color: var(--rn-text-primary, #323a46);
   background-color: var(--rn-bg-card, #f3f7f9);
@@ -542,14 +547,15 @@ body.rn-sidebar-layout.sidebar-collapsed .rn-header {
   display: none;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
   color: var(--rn-text-secondary, #546e7a);
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
 }
 
 .rn-header__hamburger:hover {
