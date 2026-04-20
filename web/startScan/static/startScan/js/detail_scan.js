@@ -1769,7 +1769,7 @@ function get_humint_employees(scan_id) {
 		$('#humint-employees-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
 		$('#humint-employees-tbody').empty();
 		if (rows.length === 0) {
-			$('#humint-employees-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			$('#humint-employees-tbody').append('<tr><td colspan="5" class="text-muted text-center">N/A</td></tr>');
 			return;
 		}
 		rows.forEach(function(emp) {
@@ -1796,7 +1796,7 @@ function get_humint_jobs(scan_id) {
 		$('#humint-jobs-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
 		$('#humint-jobs-tbody').empty();
 		if (rows.length === 0) {
-			$('#humint-jobs-tbody').append('<tr><td colspan="4" class="text-muted text-center">Tidak ada data</td></tr>');
+			$('#humint-jobs-tbody').append('<tr><td colspan="4" class="text-muted text-center">N/A</td></tr>');
 			return;
 		}
 		rows.forEach(function(job) {
@@ -1868,7 +1868,7 @@ function get_sigint_asn(scan_id) {
 		$('#sigint-asn-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
 		$('#sigint-asn-tbody').empty();
 		if (rows.length === 0) {
-			$('#sigint-asn-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			$('#sigint-asn-tbody').append('<tr><td colspan="5" class="text-muted text-center">N/A</td></tr>');
 			return;
 		}
 		rows.forEach(function(r) {
@@ -1892,7 +1892,7 @@ function get_sigint_email_security(scan_id) {
 		$('#sigint-email-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
 		$('#sigint-email-tbody').empty();
 		if (rows.length === 0) {
-			$('#sigint-email-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			$('#sigint-email-tbody').append('<tr><td colspan="5" class="text-muted text-center">N/A</td></tr>');
 			return;
 		}
 		rows.forEach(function(r) {
@@ -1920,7 +1920,7 @@ function get_sigint_intel(scan_id) {
 		$('#sigint-intel-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
 		$('#sigint-intel-tbody').empty();
 		if (rows.length === 0) {
-			$('#sigint-intel-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			$('#sigint-intel-tbody').append('<tr><td colspan="5" class="text-muted text-center">N/A</td></tr>');
 			return;
 		}
 		rows.forEach(function(r) {
@@ -1949,7 +1949,7 @@ function get_sigint_certs(scan_id) {
 		$('#sigint-cert-count').html(`<span class="badge badge-soft-primary">${rows.length}</span>`);
 		$('#sigint-cert-tbody').empty();
 		if (rows.length === 0) {
-			$('#sigint-cert-tbody').append('<tr><td colspan="5" class="text-muted text-center">Tidak ada data</td></tr>');
+			$('#sigint-cert-tbody').append('<tr><td colspan="5" class="text-muted text-center">N/A</td></tr>');
 			return;
 		}
 		rows.forEach(function(r) {
