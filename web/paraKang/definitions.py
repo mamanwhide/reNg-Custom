@@ -159,7 +159,8 @@ NUCLEI_SEVERITY_MAP = {
     'unknown': -1,
 }
 NUCLEI_REVERSE_SEVERITY_MAP = {v: k for k, v in NUCLEI_SEVERITY_MAP.items()}
-NUCLEI_DEFAULT_SEVERITIES = list(NUCLEI_SEVERITY_MAP.keys())
+# Only include valid Nuclei severity filters (exclude 'unknown' which is only for DB mapping)
+NUCLEI_DEFAULT_SEVERITIES = ['info', 'low', 'medium', 'high', 'critical']
 
 # s3scanner
 S3SCANNER_DEFAULT_PROVIDERS = ['gcp', 'aws', 'digitalocean', 'dreamhost', 'linode']
