@@ -14,7 +14,7 @@ schema_view = get_schema_view(
    openapi.Info(
       title="paraKang API",
       default_version='v1',
-      description="paraKang: An Automated reconnaissance framework.",
+      description="paraKang: An Automated AS framework.",
       contact=openapi.Contact(email="yogesh.ojha11@gmail.com"),
    ),
    public=True,

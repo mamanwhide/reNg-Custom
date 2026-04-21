@@ -17,6 +17,10 @@ urlpatterns = [
         views.profile,
         name='profile'),
     path(
+        '<slug:slug>/llm_settings/',
+        views.llm_settings,
+        name='llm_settings'),
+    path(
         '<slug:slug>/admin_interface/',
         views.admin_interface,
         name='admin_interface'),

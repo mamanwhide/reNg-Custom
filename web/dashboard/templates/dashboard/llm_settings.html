@@ -1,0 +1,148 @@
+{% extends 'base/base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}
+LLM Settings
+{% endblock title %}
+
+{% block custom_js_css_link %}
+{% endblock custom_js_css_link %}
+
+{% block page_title %}
+LLM Settings
+{% endblock page_title %}
+
+{% block breadcrumb_title %}
+<li class="breadcrumb-item"><a href="{% url 'dashboardIndex' project.slug %}">Dashboard</a></li>
+<li class="breadcrumb-item active">LLM Settings</li>
+{% endblock breadcrumb_title %}
+
+{% block main_content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h4>AI & LLM Configuration</h4>
+        <p class="text-muted">Configure settings for AI-powered vulnerability analysis and reporting</p>
+        
+        <form method="POST" class="mt-4">
+          {% csrf_token %}
+          
+          <!-- OpenAI Settings -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h5 class="mb-3">OpenAI Settings (Recommended)</h5>
+              <div class="alert alert-soft-info mb-3">
+                <i class="mdi mdi-information me-2"></i>
+                <strong>For best results:</strong> Configure OpenAI API key. Ollama is an offline alternative but requires network connectivity to download models.
+              </div>
+              <div class="mb-3">
+                <label for="key_openai" class="form-label">OpenAI API Key</label>
+                <input class="form-control" 
+                       type="password" 
+                       id="key_openai" 
+                       name="key_openai" 
+                       placeholder="sk-..." 
+                       value="{% if openai_key %}{{ openai_key.key }}{% endif %}">
+                <small class="text-muted">Used for generating vulnerability descriptions, remediation, impact, and report writing.</small>
+              </div>
+              {% if openai_key %}
+                <div class="alert alert-soft-success" role="alert">
+                  <i class="mdi mdi-check-circle me-2"></i>OpenAI API Key is configured
+                </div>
+              {% else %}
+                <div class="alert alert-soft-warning" role="alert">
+                  <i class="mdi mdi-alert-circle me-2"></i>No OpenAI API Key configured. System will fallback to Ollama if available.
+                </div>
+              {% endif %}
+            </div>
+          </div>
+
+          <hr class="my-4">
+
+          <!-- Ollama Settings -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <h5 class="mb-3">Ollama Configuration (Offline LLM)</h5>
+              <p class="text-muted small mb-3">
+                Ollama is a local LLM service for offline AI. Models need to be pulled (downloaded) first. 
+                <strong>Note:</strong> Ollama container requires internet connectivity to download models. If pull fails, ensure your Docker environment has network access.
+              </p>
+              
+              <div class="mb-3">
+                <div class="form-check form-switch">
+                  <input class="form-check-input" 
+                         type="checkbox" 
+                         id="use_ollama" 
+                         name="use_ollama"
+                         {% if ollama_settings.use_ollama %}checked{% endif %}>
+                  <label class="form-check-label" for="use_ollama">
+                    Use Ollama as primary LLM
+                  </label>
+                </div>
+                <small class="text-muted d-block mt-2">
+                  When enabled: Uses Ollama (if models available), fallback to OpenAI if configured.<br>
+                  When disabled: Uses OpenAI if key is available, fallback to Ollama if no models needed.
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Model Selection -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <label for="selected_model" class="form-label">Ollama Model</label>
+              <select class="form-select" id="selected_model" name="selected_model">
+                <option value="">-- Select Ollama Model --</option>
+                {% for model in ollama_models %}
+                  <option value="{{ model }}" {% if ollama_settings.selected_model == model %}selected{% endif %}>
+                    {{ model }}
+                  </option>
+                {% endfor %}
+              </select>
+              <small class="text-muted d-block mt-2">
+                <strong>Recommended:</strong> mistral (fast, balanced) or neural-chat (good quality)<br>
+                <strong>Current setting:</strong> {{ ollama_settings.selected_model }}<br>
+                <strong>Note:</strong> Models are automatically pulled when saved (may take several minutes depending on size)
+              </small>
+            </div>
+          </div>
+
+          <!-- Information Box -->
+          <div class="alert alert-soft-info" role="alert">
+            <h5 class="alert-heading mb-2"><i class="mdi mdi-information me-2"></i>Recommended Setup & Troubleshooting</h5>
+            <div class="mb-3">
+              <strong>Best Practice:</strong>
+              <ul class="mb-2">
+                <li>✅ Configure <strong>OpenAI API Key</strong> for reliable vulnerability report generation</li>
+                <li>✅ Set <strong>Use Ollama</strong> disabled to avoid network issues</li>
+                <li>ℹ️ Use Ollama only if you have offline requirement or network access to pull models</li>
+              </ul>
+            </div>
+            <div class="mb-3">
+              <strong>If Ollama Model Pull Fails:</strong>
+              <ul class="mb-0">
+                <li>Check Docker network connectivity: <code>docker logs ollama | grep Error</code></li>
+                <li>Verify Ollama container has internet: <code>docker exec ollama ping google.com</code></li>
+                <li>Pull models manually: <code>docker exec ollama ollama pull mistral</code></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="mt-4">
+            <button type="submit" class="btn btn-soft-primary">
+              <i class="mdi mdi-content-save me-2"></i>Save Settings
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock main_content %}
+
+{% block page_level_script %}
+{% endblock page_level_script %}

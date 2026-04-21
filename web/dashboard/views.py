@@ -1,5 +1,8 @@
 import json
 import logging
+import subprocess
+import requests
+import threading
 
 from datetime import timedelta
 
@@ -29,6 +32,30 @@ from paraKang.definitions import *
 
 
 logger = logging.getLogger(__name__)
+
+
+def _pull_ollama_model_background(model_name):
+    """Background thread function to pull Ollama model (non-blocking)"""
+    try:
+        logger.info(f'Background: Starting to pull Ollama model: {model_name}')
+        
+        result = subprocess.run(
+            ['docker', 'exec', 'ollama', 'ollama', 'pull', model_name],
+            capture_output=True,
+            text=True,
+            timeout=3600  # 1 hour timeout
+        )
+        
+        if result.returncode == 0:
+            logger.info(f'Background: Successfully pulled Ollama model: {model_name}')
+        else:
+            logger.warning(f'Background: Failed to pull model {model_name}: {result.stderr}')
+            
+    except subprocess.TimeoutExpired:
+        logger.error(f'Background: Timeout while pulling model {model_name}')
+    except Exception as e:
+        logger.error(f'Background: Error pulling model {model_name}: {str(e)}')
+
 
 def index(request, slug):
     try:
@@ -204,6 +231,73 @@ def profile(request, slug):
     return render(request, 'dashboard/profile.html', {
         'form': form
     })
+
+
+@has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def llm_settings(request, slug):
+    """Manage LLM/Ollama settings"""
+    logger = logging.getLogger(__name__)
+    
+    try:
+        project = Project.objects.get(slug=slug)
+    except Exception as e:
+        return HttpResponseRedirect(reverse('four_oh_four'))
+    
+    ollama_settings, created = OllamaSettings.objects.get_or_create(id=1)
+    openai_key = OpenAiAPIKey.objects.first()
+    
+    if request.method == 'POST':
+        use_ollama = request.POST.get('use_ollama') == 'on'
+        selected_model = request.POST.get('selected_model')
+        key_openai = request.POST.get('key_openai')
+        
+        # Update Ollama settings
+        ollama_settings.use_ollama = use_ollama
+        if selected_model:
+            ollama_settings.selected_model = selected_model
+            
+            # Auto-pull model in background if using Ollama (non-blocking)
+            if use_ollama:
+                logger.info(f'Queuing background pull for Ollama model: {selected_model}')
+                # Start pull in background thread (non-blocking)
+                pull_thread = threading.Thread(
+                    target=_pull_ollama_model_background,
+                    args=(selected_model,),
+                    daemon=True
+                )
+                pull_thread.start()
+                messages.info(request, f'Model {selected_model} pull started in background. Check logs for progress.')
+        
+        ollama_settings.save()
+        
+        # Update OpenAI key if provided
+        if key_openai:
+            if openai_key:
+                openai_key.key = key_openai
+                openai_key.save()
+            else:
+                OpenAiAPIKey.objects.create(key=key_openai)
+        
+        messages.success(request, 'LLM Settings updated successfully!')
+        return redirect('llm_settings', slug=slug)
+    
+    # Available Ollama models
+    ollama_models = [
+        'mistral',           # mistral:7b - recommended
+        'neural-chat',       # neural-chat:7b
+        'dolphin-mixtral',   # dolphin-mixtral:8x7b
+        'llama2',            # llama2:7b
+        'openchat',          # openchat:7b
+    ]
+    
+    context = {
+        'ollama_settings': ollama_settings,
+        'openai_key': openai_key,
+        'ollama_models': ollama_models,
+        'project': project,
+    }
+    
+    return render(request, 'dashboard/llm_settings.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)

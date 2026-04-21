@@ -3531,7 +3531,7 @@ def vulnerability_scan(self, urls=None, ctx=None, description=None):
 	# (nuclei, dalfox, etc.) are still running, marking the scan as complete.
 	try:
 		with allow_join_result():
-			job.get(timeout=14400, interval=5)
+			job.get(timeout=28800, interval=5)  # 28800 seconds = 8 hours
 	except ChordError as e:
 		logger.warning(f'Vulnerability scan: chord aborted (scan likely stopped): {e}')
 	except Exception as e:
@@ -4532,8 +4532,8 @@ def http_crawl(
 				fields={'IPs': ips_str},
 				add_meta_info=False)
 
-		# Add IP object for host in DB
-		if host:
+		# Add IP object for host in DB (only if host is actually an IP address)
+		if host and (validators.ipv4(host) or validators.ipv6(host)):
 			ip, created = save_ip_address(
 				host,
 				subdomain,

@@ -113,10 +113,10 @@
           {% if user|can:'modify_scan_configurations' %}
           <li><a href="{% url 'proxy_settings' current_project.slug %}" class="rn-sidebar__sublink">Proxies</a></li>
           <li><a href="{% url 'tool_settings' current_project.slug %}" class="rn-sidebar__sublink">Tool Settings</a></li>
+          <li><a href="{% url 'llm_settings' current_project.slug %}" class="rn-sidebar__sublink">LLM/AI Settings</a></li>
           {% endif %}
           {% if user|can:'modify_system_configurations' %}
           <li><a href="{% url 'api_vault' current_project.slug %}" class="rn-sidebar__sublink">API Vault</a></li>
-          <li><a href="{% url 'llm_toolkit' current_project.slug %}" class="rn-sidebar__sublink">LLM Toolkit</a></li>
           <li><a href="{% url 'tool_arsenal' current_project.slug %}" class="rn-sidebar__sublink">Tools Arsenal</a></li>
           {% endif %}
           {% if user|can:'modify_scan_report' %}
