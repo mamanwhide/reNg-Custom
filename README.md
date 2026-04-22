@@ -1,31 +1,403 @@
 
+# ParaKang
+
+**Platform Otomasi Reconnaissance Terintegrasi untuk Penilaian Kerentanan Aplikasi Web**
+
+ParaKang adalah platform berbasis kontainer Docker yang mengotomatisasi serangkaian lengkap pemindaian keamanan aplikasi web—dari enumerasi subdomain hingga assessment kerentanan dinamis, intelligence gathering komprehensif, dan analisis TLS.
+
 ## Daftar Isi
 
-- [TL;DR](#tldr)
-- [Arsitektur dan Cara Kerja](#arsitektur-dan-cara-kerja)
-- [Daftar Tools](#daftar-tools)
-- [Cara Menggunakan](#cara-menggunakan)
-- [Proxy: Sumber dan Cara Kerja](#proxy-sumber-dan-cara-kerja)
-- [Nuclei: DAST, Custom Templates, dan False Positive](#nuclei-dast-custom-templates-dan-false-positive)
-- [Instalasi](#instalasi)
+- [Ringkasan Eksekutif](#ringkasan-eksekutif)
+- [Memulai Cepat](#memulai-cepat)
+- [Konfigurasi Awal](#konfigurasi-awal)
+- [Manajemen Pengguna dan Otentikasi](#manajemen-pengguna-dan-otentikasi)
+- [Panduan Penggunaan](#panduan-penggunaan)
+- [Arsitektur Sistem](#arsitektur-sistem)
+- [Daftar Tools Terintegrasi](#daftar-tools-terintegrasi)
+- [Sistem Proxy Dinamis](#sistem-proxy-dinamis)
+- [Nuclei dan Template DAST](#nuclei-dan-template-dast)
+- [REST API Reference](#rest-api-reference)
+- [Instalasi Lengkap](#instalasi-lengkap)
+- [Pemecahan Masalah](#pemecahan-masalah)
 - [Riwayat Pembaruan](#riwayat-pembaruan)
 
 ---
 
-## TL;DR
+## Ringkasan Eksekutif
 
-paraKang adalah platform otomasi reconnaissance web aplikasi berbasis Docker. Pengguna mendefinisikan target domain, memilih scan engine (sekumpulan konfigurasi YAML), lalu sistem menjalankan seluruh tahapan recon secara otomatis mulai dari enumerasi subdomain hingga pemindaian kerentanan, OSINT, dan analisis sertifikat TLS, semuanya disimpan ke database PostgreSQL dan dapat difilter via antarmuka web.
+ParaKang menyediakan orkestrasi terintegrasi dari 25+ alat reconnaissance dan vulnerability assessment berbasis Docker dengan koordinasi Celery untuk eksekusi paralel skala besar.
 
-Fork ini menambahkan:
-- 27 perbaikan keamanan (dari audit mendalam terhadap 20 file sumber)
-- Perbaikan integrasi Ollama LLM untuk laporan kerentanan
-- OSINT mendalam: HUMINT (GitHub org recon, LinkedIn dork, job posting intel) dan SIGINT (ASN/BGP, SPF/DKIM/DMARC, passive intel via Shodan, analisis sertifikat TLS)
-- Perbaikan dorking (deteksi blokir GooFuzz, fallback Bing, proxy otomatis)
-- Template DAST nuclei (249 template: AI, CVE, vulnerabilities) dengan eksklusi false-positive
+**Kemampuan Utama:**
+- **Active Discovery**: Enumerasi subdomain dari 7 sumber berbeda, port scanning (naabu), HTTP probing (httpx), teknologi detection (Wappalyzer)
+- **Intelligence Gathering**: HUMINT (GitHub org enumeration, LinkedIn employee discovery, job posting analysis), SIGINT (ASN/BGP enumeration, email security audit, TLS certificate analysis, passive intelligence via Shodan/Censys/InternetDB)
+- **Vulnerability Assessment**: Template DAST nuclei (249+ template), reflected XSS detection (dalfox), CRLF injection (crlfuzz), S3 bucket misconfiguration, WAF detection (wafw00f)
+- **Advanced Reporting**: LLM-enhanced vulnerability descriptions dengan dukungan OpenAI dan Ollama lokal, CVSS tracking, HackerOne integration
+- **Advanced Features**: Dynamic proxy rotation dari 4 sumber publik, subscan targeting, intelligent de-duplication, role-based access control, webhook notifications (Slack/Discord/Telegram)
+
+**Peningkatan Keamanan Edisi Custom:**
+- 27 remediasi keamanan dari audit mendalam (2 CRITICAL, 7 HIGH, 10 MEDIUM, 8 LOW)
+- Integrasi LLM yang diperbaiki untuk vulnerability reporting
+- Template DAST komprehensif dengan kontrol false-positive granular
+- Hardening proxy dengan deteksi IP blocking dan fallback otomatis
+- Dynamic Ollama model selection untuk maksimum fleksibilitas
 
 ---
 
-## Arsitektur dan Cara Kerja
+## Memulai Cepat
+
+### Prasyarat Sistem
+
+```
+Sistem Operasi:  Ubuntu 20.04+ / Debian / Kali Linux
+Docker:          20.10+ dengan Docker Compose 2.0+
+RAM:             Minimum 4 GB (disarankan 8 GB+)
+Disk:            Minimum 20 GB untuk scan results dan model
+Koneksi:         Internet (untuk download tools dan models)
+Akses Root:      Diperlukan untuk instalasi (sudo)
+```
+
+### Instalasi Cepat (3 Langkah)
+
+**Langkah 1: Persiapan Repositori**
+```bash
+# Clone dan masuk direktori
+git clone <repository-url> paraKang-Custom
+cd paraKang-Custom
+
+# Salin dan konfigurasi environment
+cp .env.example .env
+
+# Edit .env dengan text editor favorit
+# Ubah PASSWORD: POSTGRES_PASSWORD, REDIS_PASSWORD
+nano .env
+```
+
+**Langkah 2: Jalankan Installer**
+```bash
+# Mode interaktif (rekomendasi untuk first-time setup)
+sudo ./install.sh
+
+# Atau mode otomatis (non-interactive)
+sudo ./install.sh -n
+```
+
+Proses ini akan:
+- ✓ Memverifikasi Docker installation
+- ✓ Build image container (web, celery, database, redis)
+- ✓ Inisialisasi database PostgreSQL
+- ✓ Jalankan migrasi Django
+- ✓ Setup user admin pertama (via prompt atau .env)
+- ✓ Siapkan Ollama container untuk LLM (opsional)
+
+**Langkah 3: Akses Aplikasi**
+```bash
+# Verifikasi semua container running
+docker compose ps
+
+# Akses di browser
+# HTTP (development):  http://localhost
+# HTTPS (production):  https://localhost (dengan self-signed cert)
+# API endpoint:        http://localhost:8000/api/
+```
+
+**Login Awal:**
+- Username: `admin` (atau sesuai `DJANGO_SUPERUSER_USERNAME` di .env)
+- Password: Sesuai `DJANGO_SUPERUSER_PASSWORD` di .env
+
+---
+
+## Konfigurasi Awal
+
+### Variabel Environment Penting
+
+Edit `.env` sebelum menjalankan `install.sh`:
+
+| Variabel | Default | Keterangan |
+|----------|---------|-----------|
+| `POSTGRES_PASSWORD` | - | **WAJIB** ubah dari .env.example |
+| `REDIS_PASSWORD` | - | **WAJIB** ubah dari .env.example |
+| `DOMAIN_NAME` | `localhost` | Hostname untuk aplikasi (production: domain Anda) |
+| `DEBUG` | `0` | Jangan ubah ke `1` di production |
+| `DJANGO_SUPERUSER_USERNAME` | `admin` | Username admin pertama |
+| `DJANGO_SUPERUSER_PASSWORD` | - | Password admin (auto-generate jika kosong) |
+| `DJANGO_SUPERUSER_EMAIL` | `admin@localhost` | Email admin |
+| `MIN_CONCURRENCY` | `10` | Minimum worker Celery aktif |
+| `MAX_CONCURRENCY` | `30` | Maximum worker paralel (sesuaikan dengan RAM) |
+| `GUNICORN_WORKERS` | `4` | Django worker processes |
+| `GUNICORN_THREADS` | `2` | Thread per worker |
+
+**Rekomendasi Concurrency Berdasarkan RAM:**
+```
+4 GB RAM:   MIN_CONCURRENCY=5,  MAX_CONCURRENCY=10
+8 GB RAM:   MIN_CONCURRENCY=10, MAX_CONCURRENCY=30
+16 GB RAM:  MIN_CONCURRENCY=20, MAX_CONCURRENCY=50
+32 GB RAM:  MIN_CONCURRENCY=30, MAX_CONCURRENCY=100
+```
+
+### Integrasi API Eksternal (Opsional)
+
+Setelah login ke Dashboard → Settings → API Vault, konfigurasi API key:
+
+| Service | Konfigurasi | Kegunaan |
+|---------|----------|----------|
+| **OpenAI** | API Key | LLM untuk vulnerability description (rekomendasi: gpt-3.5-turbo atau gpt-4) |
+| **Ollama** | Auto-detect (port 11434) | LLM offline local (alternativ OpenAI) |
+| **Shodan** | API Key | Passive intelligence (open ports, CVE, services) |
+| **Censys** | API ID + Secret | IP geolocation, certificate analysis |
+| **Netlas** | API Key | Subdomain dan certificate enumeration |
+| **HackerOne** | Username + API Key | Sync bug bounty programs |
+| **Slack / Discord / Telegram** | Webhook URL | Notifikasi scan completion |
+
+### Setup Proxy (Opsional)
+
+```bash
+# Manual: Dashboard → Settings → Proxy
+# Setup: Masukkan IP:PORT proxy lokal jika ada
+
+# Otomatis: Proxy publik gratis di-fetch setiap 7 hari
+# Cek jadwal di Dashboard → Activity Logs
+```
+
+---
+
+## Manajemen Pengguna dan Otentikasi
+
+### Struktur Role dan Permissions
+
+ParaKang memiliki 3 role dengan hirarki izin:
+
+| Role | Akses | Keterangan |
+|------|-------|-----------|
+| **System Administrator** | Semua fitur | Full access: config sistem, semua scan, user management, API keys |
+| **Penetration Tester** | Scan & Targets | Create/edit targets, run scans, subscan, view results (tidak bisa akses settings sistem) |
+| **Auditor** | Read-only | Hanya view hasil scan dan generate report (tidak bisa create scan) |
+
+### Membuat User Baru
+
+**Metode 1: Via Django Admin (Recommended)**
+```bash
+# Akses Django admin shell
+docker exec parakang-web-1 python manage.py shell
+
+# Di Python shell:
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+# Buat user baru
+user = User.objects.create_user(
+    username='john_pentester',
+    email='john@company.com',
+    password='SecurePassword123!',
+    first_name='John',
+    last_name='Doe'
+)
+
+# Assign role (menggunakan django-role-permissions)
+from rolepermissions.roles import assign_role
+assign_role(user, 'penetration_tester')
+
+print(f"User created: {user.username} with role: penetration_tester")
+exit()
+```
+
+**Metode 2: Via Django Command (Production)**
+```bash
+docker exec parakang-web-1 python manage.py createsuperuser \
+  --username john_admin \
+  --email john@company.com
+  
+# Ikuti prompt untuk password
+# Lalu assign role via Django shell (Metode 1)
+```
+
+**Metode 3: Via Django Admin Web Interface**
+```
+1. Login ke https://localhost/admin/ dengan credentials admin
+2. Navigate ke: Users
+3. Click: Add User
+4. Isi: username, email, password
+5. Save
+6. Edit kembali user yang baru dibuat
+7. Di group section, assign role yang sesuai
+8. Save
+```
+
+### Mengubah Password User
+
+**User Mengubah Sendiri:**
+```
+1. Login ke aplikasi
+2. Click profile icon (top-right)
+3. Click "Change Password"
+4. Masukkan password lama dan baru
+5. Save
+```
+
+**Admin Mereset Password User:**
+```bash
+docker exec parakang-web-1 python manage.py shell
+
+from django.contrib.auth import get_user_model
+User = get_user_model()
+
+user = User.objects.get(username='john_pentester')
+user.set_password('NewSecurePassword123!')
+user.save()
+
+print(f"Password reset for {user.username}")
+exit()
+```
+
+### Mengelola Role dan Permission
+
+```bash
+# List semua user dan role mereka
+docker exec parakang-web-1 python manage.py shell
+
+from django.contrib.auth import get_user_model
+from rolepermissions.roles import get_user_roles
+
+User = get_user_model()
+for user in User.objects.all():
+    roles = get_user_roles(user)
+    print(f"{user.username}: {', '.join([r.get_name() for r in roles])}")
+
+exit()
+```
+
+### User Preferences per Project
+
+Setiap user dapat mengkonfigurasi preference di Dashboard → Settings:
+
+| Setting | Default | Keterangan |
+|---------|---------|-----------|
+| **Bug Bounty Mode** | Off | Highlight hanya findings yang bug bounty-relevant |
+| **Notification Preference** | On | Enable/disable notifikasi |
+| **API Token** | Auto-gen | REST API authentication |
+
+---
+
+## Panduan Penggunaan
+
+---
+
+### Membuat dan Menjalankan Scan
+
+**Langkah 1: Buat Project (Container Logis)**
+```
+Dashboard → Projects → New Project
+  Project Name: "PT-Client-ABC"
+  Description: "Penetration test for ABC Corporation"
+  Create
+```
+
+**Langkah 2: Tambah Target Domain**
+```
+Dashboard → Targets (di bawah project) → Add Target
+  Domain: example.com
+  Organization: ABC Corp (optional)
+  In Scope CIDR: 192.0.2.0/24 (untuk target private)
+  Custom Headers: X-Custom-Header: value
+  Save
+```
+
+**Langkah 3: Pilih Scan Engine dan Jalankan**
+```
+Target detail page → Initiate Scan
+  Select Engine: "Full Scan" atau custom engine
+  Proxy Mode: Auto (gunakan proxy) / Direct (tanpa proxy)
+  Intensity: Normal / Aggressive (impact ke rate limiting)
+  Start Scan
+```
+
+**Monitoring Scan Progress:**
+- Real-time progress bar di Dashboard
+- View logs: Activity Logs tab
+- Cancel anytime jika perlu
+
+**Langkah 4: Review Hasil**
+```
+Scan Results → Findings
+  Filter by: Severity (Critical/High/Medium/Low)
+  Filter by: Type (Subdomain/Endpoint/Vulnerability)
+  Export: CSV / JSON / PDF Report
+```
+
+### Subscan (Re-scan Target Spesifik)
+
+Untuk scan ulang domain atau subdomain tanpa full scan:
+
+```
+Scan Results → Select Subdomain/Domain
+  Click: "SubScan"
+  Select Type: 
+    - Port Scan: naabu + nmap
+    - Vulnerability: nuclei + dalfox
+    - Screenshot: gowitness
+    - Tech Detect: Wappalyzer
+  Run
+```
+
+### Menggunakan Scan Engines Kustom
+
+Buat engine configuration YAML untuk workflow spesifik:
+
+**Dashboard → Scan Engines → Create Custom Engine**
+
+```yaml
+# Contoh: OSINT Only (no active scanning)
+name: OSINT Recon
+description: Passive intelligence gathering only
+enabled: true
+
+discovery:
+  subfinder: true
+  passive_sources:
+    - certspotter
+    - crt.sh
+  skip_active: true
+
+osint:
+  discover: [emails, employees]
+  dorks: [login_pages, admin_panels]
+  humint:
+    github_org: true
+    linkedin: true
+    job_postings: true
+  sigint:
+    asn_recon: true
+    email_security: true
+
+vulnerability_scan:
+  enabled: false
+```
+
+### Eksport dan Reporting
+
+**Generate Report:**
+```
+Scan Results → Export
+  Format: PDF / HTML / JSON / CSV
+  Include:
+    ☑ Executive Summary
+    ☑ Technical Findings
+    ☑ Screenshots
+    ☑ Remediation Guide (LLM-powered)
+  Download
+```
+
+**API Integration untuk Custom Reporting:**
+```bash
+# Fetch semua vulnerability dari scan tertentu
+curl -H "Authorization: Bearer $API_TOKEN" \
+  "http://localhost:8000/api/listVulnerability/?scan_id=123"
+
+# Response: JSON array dengan vulnerability details
+```
+
+---
+
+## Arsitektur Sistem
 
 ```
 Browser (HTTPS)
@@ -67,7 +439,7 @@ Alur kerja scan:
 
 ---
 
-## Daftar Tools
+## Daftar Tools Terintegrasi
 
 | Kategori | Tool | Keterangan |
 |----------|------|-----------|
@@ -97,74 +469,7 @@ Alur kerja scan:
 
 ---
 
-## Cara Menggunakan
-
-### Menjalankan Scan
-
-1. Buka antarmuka web di `https://localhost` (atau IP server)
-2. Buat project baru (menu Projects)
-3. Tambahkan target domain (menu Targets)
-4. Pilih scan engine dari daftar yang tersedia:
-   - **Full Scan**: semua modul aktif termasuk HUMINT, SIGINT, DAST
-   - **OSINT**: hanya OSINT, HUMINT, SIGINT, dorking
-   - **Subdomain Scan**: hanya enumerasi subdomain
-   - **Vulnerability Scan**: subdomain + port scan + nuclei
-   - **Port Scan**: hanya port scan
-   - **paraKang Recommended**: set default yang seimbang
-5. Klik "Initiate Scan"
-
-### Konfigurasi Scan Engine (YAML)
-
-Setiap engine dikonfigurasi via YAML. Contoh untuk mengaktifkan HUMINT dan SIGINT pada OSINT engine:
-
-```yaml
-osint:
-  discover: [emails, metainfo, employees]
-  dorks: [login_pages, admin_panels, config_files, git_exposed]
-  humint:
-    github_org: true
-    linkedin: true
-    job_postings: true
-  sigint:
-    asn_recon: true
-    email_security: true
-    passive_intel: false   # perlu SHODAN_API_KEY di settings
-    cert_analysis: true
-  documents_limit: 50
-```
-
-### Subscan
-
-Untuk scan ulang domain atau subdomain tertentu tanpa menjalankan full scan:
-- Di halaman hasil scan, klik subdomain yang ingin di-subscan
-- Pilih jenis subscan (port scan, vulnerability scan, screenshot, dll)
-
-### Notifikasi
-
-Notifikasi aktif untuk:
-- Subdomain baru ditemukan
-- Kerentanan baru ditemukan
-- Commit baru di repository ini (via endpoint `/api/parakang/update/`)
-
-Notifikasi dari GitHub upstream paraKang (yogeshojha/parakang) telah dinonaktifkan.
-
-### Melihat Hasil HUMINT / SIGINT
-
-Hasil HUMINT dan SIGINT tersedia via REST API:
-
-| Endpoint | Isi |
-|----------|-----|
-| `/api/queryHumintEmployees/?scan_id=X` | Profil karyawan dari GitHub dan LinkedIn |
-| `/api/queryHumintGithub/?scan_id=X` | Hasil GitHub org recon |
-| `/api/queryHumintJobPostings/?scan_id=X` | Job posting dan tech stack |
-| `/api/querySigintAsn/?scan_id=X` | Daftar ASN dan CIDR ranges |
-| `/api/querySigintEmailSecurity/?scan_id=X` | SPF, DKIM, DMARC, risiko spoofing |
-| `/api/querySigintIntelligence/?scan_id=X` | IP, port terbuka, CVE dari Shodan |
-| `/api/querySigintCertificates/?scan_id=X&risk_only=1` | Sertifikat TLS dengan anomali |
-
----
-
-## Proxy: Sumber dan Cara Kerja
+## Sistem Proxy Dinamis
 
 paraKang-Custom menggunakan proxy untuk melindungi IP asli selama scanning (terutama subdomain discovery, nuclei, fetch URL, dan dorking Google). Sistem proxy bersifat otomatis — tidak perlu konfigurasi manual jika menggunakan proxy gratis.
 
@@ -275,7 +580,7 @@ docker logs parakang-celery-1 --since=15m 2>&1 | grep -i "Using proxy\|no workin
 
 ---
 
-## Nuclei: DAST, Custom Templates, dan False Positive
+## Nuclei dan Template DAST
 
 ### Mengaktifkan DAST
 
@@ -407,7 +712,73 @@ Untuk menggunakan template nuclei sendiri:
 
 ---
 
-## Instalasi
+## REST API Reference
+
+ParaKang menyediakan REST API lengkap untuk integrasi dengan tools eksternal dan automation. Semua endpoint memerlukan authentication via session Django atau API token.
+
+### Authentication
+
+```bash
+# Session-based (login via web):
+curl -b cookies.txt -c cookies.txt http://localhost:8000/api/
+
+# Token-based (recommended untuk scripts):
+curl -H "Authorization: Bearer YOUR_API_TOKEN" http://localhost:8000/api/
+```
+
+Dapatkan API token di: Dashboard → Settings → API Token
+
+### Endpoint Utama
+
+| Kategori | Endpoint | Method | Deskripsi |
+|----------|----------|--------|-----------|
+| **Targets** | `/api/queryTargets/` | GET | List semua target |
+| **Targets** | `/api/add/target/` | POST | Buat target baru |
+| **Subdomains** | `/api/listSubdomains/?domain_id=X` | GET | List subdomain |
+| **Vulnerabilities** | `/api/listVulnerability/?scan_id=X` | GET | List vulnerability findings |
+| **Endpoints** | `/api/listEndpoints/?domain_id=X` | GET | List HTTP endpoints |
+| **Scans** | `/api/listScanHistory/?domain_id=X` | GET | List scan history |
+| **HUMINT** | `/api/queryHumintEmployees/?scan_id=X` | GET | Karyawan enumeration |
+| **SIGINT** | `/api/querySigintAsn/?scan_id=X` | GET | ASN/CIDR enumeration |
+| **SIGINT** | `/api/querySigintEmailSecurity/?scan_id=X` | GET | Email security audit |
+| **SIGINT** | `/api/querySigintCertificates/?scan_id=X` | GET | TLS certificate analysis |
+| **Proxy** | `/api/tool/ollama/` | GET/POST | Manage Ollama models |
+| **GPT** | `/api/tools/gpt_vulnerability_report/?id=X` | GET | LLM vulnerability description |
+
+### Contoh Penggunaan
+
+**Fetch semua findings dari scan:**
+```bash
+SCAN_ID=123
+TOKEN="your_api_token"
+
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:8000/api/listVulnerability/?scan_id=$SCAN_ID" \
+  | jq '.[] | {name, severity, cvss_score, http_url}'
+```
+
+**Create scan via API:**
+```bash
+curl -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "domain_id": 5,
+    "engine_id": 1,
+    "scan_mode": "active"
+  }' \
+  http://localhost:8000/api/add/target/
+```
+
+**Dokumentasi lengkap API:**
+```bash
+# Access Swagger/OpenAPI docs
+open http://localhost:8000/api/schema/
+```
+
+---
+
+## Instalasi Lengkap
 
 ### Prasyarat
 
@@ -458,6 +829,197 @@ Panduan berdasarkan RAM:
 
 ```bash
 cd paraKang-Custom && sudo ./update.sh
+```
+
+---
+
+## Pemecahan Masalah
+
+### Container Tidak Bisa Start
+
+**Gejala**: `docker compose up` error atau container immediately exits
+
+```bash
+# Check logs
+docker compose logs web --tail=50
+
+# Umum: database connection error
+# Solusi: Pastikan POSTGRES_PASSWORD di .env sudah diubah dari contoh
+# Lalu rebuild: docker compose up -d --build
+```
+
+### Database Migration Error
+
+**Gejala**: `django.db.utils.OperationalError: database does not exist`
+
+```bash
+# Restart database container
+docker compose restart db
+
+# Tunggu 10 detik lalu coba lagi
+sleep 10
+docker compose restart web
+
+# Jika tetap error, reset database (WARNING: semua data hilang)
+docker compose down -v
+sudo ./install.sh -n
+```
+
+### Celery Worker Tidak Memproses Task
+
+**Gejala**: Scan "In Progress" selamanya, logs tidak ada di Celery
+
+```bash
+# Check celery worker status
+docker compose ps celery
+
+# Lihat logs
+docker compose logs celery --tail=100
+
+# Restart celery worker
+docker compose restart celery
+
+# Check Redis connection
+docker exec parakang-redis-1 redis-cli ping
+# Expected: PONG
+```
+
+### Ollama Model Pull Error
+
+**Gejala**: "Model not found" atau "Connection refused"
+
+```bash
+# Verifikasi Ollama container running
+docker compose ps ollama
+
+# Check Ollama API endpoint
+curl http://ollama:11434/api/tags
+
+# Manual pull dari container
+docker exec parakang-ollama-1 ollama pull mistral
+
+# Lihat models yang sudah ada
+docker exec parakang-ollama-1 ollama list
+```
+
+### High Memory Usage / Out of Memory
+
+**Gejala**: Container killed atau system hang saat scan berjalan
+
+```bash
+# Check memory usage
+docker stats --no-stream
+
+# Kurangi concurrency di .env
+MAX_CONCURRENCY=20  # dari 30 menjadi 20
+
+# Reduce Celery memory limit
+# Edit docker-compose.yml:
+# celery:
+#   mem_limit: 2g  # dari 4g menjadi 2g
+
+docker compose up -d --build
+```
+
+### Proxy Test Gagal
+
+**Gejala**: "No working proxy found" atau proxy connection timeout
+
+```bash
+# Force proxy refresh sekarang (tidak tunggu 7 hari)
+docker exec parakang-celery-1 python -c \
+  "from paraKang.tasks import fetch_free_proxies; fetch_free_proxies()"
+
+# Check proxy list di database
+docker exec parakang-web-1 python manage.py shell
+from dashboard.models import Proxy
+print(f"Total proxies: {Proxy.objects.count()}")
+exit()
+
+# Manual set proxy
+# Dashboard → Settings → Proxy → tambahkan IP:PORT
+```
+
+### Scan Timeout / Stuck
+
+**Gejala**: Scan progress tidak update, tidak ada error
+
+```bash
+# Check Nginx proxy_timeout (default 900s)
+docker exec parakang-proxy-1 cat /etc/nginx/nginx.conf | grep proxy_read_timeout
+
+# Jika perlu increase timeout (untuk scan domain besar)
+# Edit config/nginx/rengine.conf:
+# proxy_read_timeout 1200;
+# Lalu reload nginx:
+docker exec parakang-proxy-1 nginx -s reload
+```
+
+### LLM Report Generation Error
+
+**Gejala**: "Oops... Something went wrong!" saat generate vulnerability report
+
+```bash
+# Check OpenAI API key
+docker exec parakang-web-1 python manage.py shell
+from paraKang.common_func import get_open_ai_key
+print(f"OpenAI key configured: {bool(get_open_ai_key())}")
+exit()
+
+# Cek Ollama model availability
+docker exec parakang-web-1 python manage.py shell
+from paraKang.common_func import get_available_ollama_models
+models = get_available_ollama_models()
+print(f"Available Ollama models: {[m['name'] for m in models]}")
+exit()
+
+# Increase proxy timeout (LLM requests bisa lama)
+# Edit config/nginx/rengine.conf: proxy_read_timeout 900;
+```
+
+### Scan Results Tidak Muncul
+
+**Gejala**: Scan "Completed" tapi hasil kosong
+
+```bash
+# Check scan task logs
+docker compose logs celery | grep -i "scan_id=123"
+
+# Verify database records
+docker exec parakang-web-1 python manage.py shell
+from startScan.models import ScanHistory
+scan = ScanHistory.objects.get(id=123)
+print(f"Subdomain count: {scan.subdomain_set.count()}")
+print(f"Vulnerability count: {scan.vulnerability_set.count()}")
+exit()
+
+# Trigger subscan untuk domain tertentu
+# Dashboard → Scan Results → Select Domain → SubScan
+```
+
+### Reset Admin Password
+
+**Jika lupa password admin:**
+
+```bash
+docker exec parakang-web-1 python manage.py changepassword admin
+
+# Atau create superuser baru
+docker exec parakang-web-1 python manage.py createsuperuser
+```
+
+### Rollback ke Versi Sebelumnya
+
+```bash
+# List commits
+git log --oneline
+
+# Checkout ke commit tertentu
+git checkout abc1234
+
+# Rebuild containers
+docker compose build --no-cache
+docker compose up -d
 ```
 
 ---
