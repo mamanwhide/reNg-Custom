@@ -13,7 +13,7 @@ To report a security vulnerability, please follow these steps:
 
 1. **Do Not** disclose the vulnerability publicly on GitHub issues or any other public forum.
 
-2. Go to the [Security tab](https://github.com/yogeshojha/parakang/security) of the paraKang repository.
+2. Go to the [Security tab](https://github.com/mamanwhide/paraKang/security) of the paraKang repository.
 
 3. Click on "Report a vulnerability" to open GitHub's private vulnerability reporting form.
 
@@ -46,8 +46,8 @@ Thanks to these individuals for reporting Security Issues in paraKang.
 
 ### 2024
 
-* [HIGH] [Command Injection](https://github.com/yogeshojha/parakang/security/advisories/GHSA-fx7f-f735-vgh4) in Waf Detector, Reported by [n-thumann](https://github.com/n-thumann)
-* [MEDIUM] [Stored XSS](https://github.com/yogeshojha/parakang/security/advisories/GHSA-96q4-fj2m-jqf7) in in Vulnerability Page, Reported by [Touhid M Shaikh](https://github.com/touhidshaikh)
+* [HIGH] [Command Injection](https://github.com/mamanwhide/paraKang/security/advisories/GHSA-fx7f-f735-vgh4) in Waf Detector, Reported by [n-thumann](https://github.com/n-thumann)
+* [MEDIUM] [Stored XSS](https://github.com/mamanwhide/paraKang/security/advisories/GHSA-96q4-fj2m-jqf7) in in Vulnerability Page, Reported by [Touhid M Shaikh](https://github.com/touhidshaikh)
 
 ### 2022
 
@@ -67,9 +67,9 @@ Thanks to these individuals for reporting Security Issues in paraKang.
 
 
 ### 2021
-* [LOW] [Stored XSS](https://github.com/yogeshojha/parakang/issues/178) on Detail Scan Page via Page Title Parameter, Reported by [omemishra](https://github.com/omemishra)
+* [LOW] [Stored XSS](https://github.com/mamanwhide/paraKang/issues/178) on Detail Scan Page via Page Title Parameter, Reported by [omemishra](https://github.com/omemishra)
 
-* [LOW] [Stored XSS](https://github.com/yogeshojha/parakang/issues/347) on Vulnerability Scan page via URL Parameter, Reported by [Arif Khan, payloadartist](https://twitter.com/payloadartist)
+* [LOW] [Stored XSS](https://github.com/mamanwhide/paraKang/issues/347) on Vulnerability Scan page via URL Parameter, Reported by [Arif Khan, payloadartist](https://twitter.com/payloadartist)
 
 * [LOW] Several Instances of XSS in paraKang 1.0 (#460, #459, #458, #457, #456, #455), Reported by [Binit Ghimire](https://github.com/TheBinitGhimire)
 

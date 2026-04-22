@@ -26,7 +26,7 @@ LLM Settings
         <h4>AI & LLM Configuration</h4>
         <p class="text-muted">Configure settings for AI-powered vulnerability analysis and reporting</p>
         
-        <form method="POST" class="mt-4">
+        <form method="POST" class="mt-4" id="llmSettingsForm">
           {% csrf_token %}
           
           <!-- OpenAI Settings -->
@@ -89,23 +89,68 @@ LLM Settings
             </div>
           </div>
 
+          <!-- Available Models List -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <label class="form-label">Available Ollama Models</label>
+              <div id="availableModelsContainer" class="border rounded p-3" style="background-color: #f8f9fa; min-height: 100px;">
+                <div class="text-center text-muted">
+                  <div class="spinner-border spinner-border-sm me-2" role="status" style="width: 1rem; height: 1rem;">
+                    <span class="visually-hidden">Loading...</span>
+                  </div>
+                  Loading available models...
+                </div>
+              </div>
+              <small class="text-muted d-block mt-2">
+                Models currently installed on your local Ollama instance. Click to select or pull new models.
+              </small>
+            </div>
+          </div>
+
           <!-- Model Selection -->
           <div class="row mb-4">
             <div class="col-12">
-              <label for="selected_model" class="form-label">Ollama Model</label>
-              <select class="form-select" id="selected_model" name="selected_model">
-                <option value="">-- Select Ollama Model --</option>
-                {% for model in ollama_models %}
-                  <option value="{{ model }}" {% if ollama_settings.selected_model == model %}selected{% endif %}>
-                    {{ model }}
-                  </option>
-                {% endfor %}
-              </select>
+              <label for="selected_model" class="form-label">Selected Model</label>
+              <div class="input-group">
+                <select class="form-select" id="selected_model" name="selected_model">
+                  <option value="">-- Select Ollama Model --</option>
+                  {% for model in ollama_models %}
+                    <option value="{{ model }}" {% if ollama_settings.selected_model == model %}selected{% endif %}>
+                      {{ model }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
               <small class="text-muted d-block mt-2">
                 <strong>Recommended:</strong> mistral (fast, balanced) or neural-chat (good quality)<br>
-                <strong>Current setting:</strong> {{ ollama_settings.selected_model }}<br>
+                <strong>Current setting:</strong> <span id="currentModel">{{ ollama_settings.selected_model }}</span><br>
                 <strong>Note:</strong> Models are automatically pulled when saved (may take several minutes depending on size)
               </small>
+            </div>
+          </div>
+
+          <!-- Pull Custom Model Section -->
+          <div class="row mb-4">
+            <div class="col-12">
+              <label class="form-label">Pull New Model from Ollama Registry</label>
+              <div class="input-group">
+                <input type="text" 
+                       class="form-control" 
+                       id="pullModelName" 
+                       placeholder="e.g. mistral, llama2, neural-chat"
+                       autocomplete="off">
+                <button type="button" 
+                        class="btn btn-outline-secondary" 
+                        id="pullModelBtn"
+                        onclick="pullCustomModel()">
+                  <i class="mdi mdi-download me-1"></i>Pull Model
+                </button>
+              </div>
+              <small class="text-muted d-block mt-2">
+                Enter a model name from <a href="https://ollama.com/library" target="_blank">Ollama Library</a> 
+                (e.g., mistral, llama2, neural-chat, dolphin-mixtral)
+              </small>
+              <div id="pullModelStatus" class="mt-2"></div>
             </div>
           </div>
 
@@ -115,9 +160,9 @@ LLM Settings
             <div class="mb-3">
               <strong>Best Practice:</strong>
               <ul class="mb-2">
-                <li>✅ Configure <strong>OpenAI API Key</strong> for reliable vulnerability report generation</li>
-                <li>✅ Set <strong>Use Ollama</strong> disabled to avoid network issues</li>
-                <li>ℹ️ Use Ollama only if you have offline requirement or network access to pull models</li>
+                <li>Configure <strong>OpenAI API Key</strong> for reliable vulnerability report generation</li>
+                <li>Set <strong>Use Ollama</strong> disabled to avoid network issues</li>
+                <li>Use Ollama only if you have offline requirement or network access to pull models</li>
               </ul>
             </div>
             <div class="mb-3">
@@ -145,4 +190,172 @@ LLM Settings
 {% endblock main_content %}
 
 {% block page_level_script %}
+<script>
+  // Load available models on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    loadAvailableModels();
+  });
+
+  function loadAvailableModels() {
+    const container = document.getElementById('availableModelsContainer');
+    
+    fetch('/api/ollama/models/', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status && data.models.length > 0) {
+        renderModelsList(data.models);
+        updateModelDropdown(data.models);
+      } else {
+        container.innerHTML = `
+          <div class="alert alert-warning mb-0">
+            <i class="mdi mdi-alert-circle me-2"></i>
+            No models found. Pull a model to get started.
+          </div>
+        `;
+      }
+    })
+    .catch(error => {
+      console.error('Error loading models:', error);
+      container.innerHTML = `
+        <div class="alert alert-danger mb-0">
+          <i class="mdi mdi-alert-circle me-2"></i>
+          Failed to load models. Make sure Ollama container is running.
+        </div>
+      `;
+    });
+  }
+
+  function renderModelsList(models) {
+    const container = document.getElementById('availableModelsContainer');
+    let html = '<div class="row g-2">';
+    
+    models.forEach(model => {
+      const isSelected = model.name === '{{ ollama_settings.selected_model }}';
+      html += `
+        <div class="col-md-6">
+          <div class="card border ${isSelected ? 'border-primary bg-light' : ''}" style="cursor: pointer;" onclick="selectModel('${model.name}')">
+            <div class="card-body p-2">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="card-title mb-1">${model.name}</h6>
+                  <small class="text-muted">${model.size_gb}GB</small>
+                </div>
+                ${isSelected ? '<span class="badge bg-primary">Selected</span>' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+  }
+
+  function updateModelDropdown(models) {
+    const select = document.getElementById('selected_model');
+    const currentOptions = Array.from(select.options).slice(1); // Skip "Select Model" option
+    
+    // Add new models that aren't already in the dropdown
+    models.forEach(model => {
+      const exists = Array.from(select.options).some(opt => opt.value === model.name);
+      if (!exists) {
+        const option = document.createElement('option');
+        option.value = model.name;
+        option.text = `${model.name} (${model.size_gb}GB)`;
+        select.appendChild(option);
+      }
+    });
+  }
+
+  function selectModel(modelName) {
+    const select = document.getElementById('selected_model');
+    select.value = modelName;
+    document.getElementById('currentModel').textContent = modelName;
+  }
+
+  function pullCustomModel() {
+    const modelName = document.getElementById('pullModelName').value.trim();
+    const statusDiv = document.getElementById('pullModelStatus');
+    const btn = document.getElementById('pullModelBtn');
+    
+    if (!modelName) {
+      statusDiv.innerHTML = '<div class="alert alert-warning alert-sm mb-0">Please enter a model name</div>';
+      return;
+    }
+    
+    // Show loading state
+    btn.disabled = true;
+    statusDiv.innerHTML = `
+      <div class="alert alert-info alert-sm mb-0">
+        <div class="spinner-border spinner-border-sm me-2" role="status" style="width: 1rem; height: 1rem;">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+        Pulling model ${modelName}... This may take several minutes.
+      </div>
+    `;
+    
+    fetch('/api/ollama/models/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      },
+      body: JSON.stringify({
+        model: modelName
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.status) {
+        statusDiv.innerHTML = `
+          <div class="alert alert-success alert-sm mb-0">
+            <i class="mdi mdi-check-circle me-2"></i>
+            Model ${modelName} pulled successfully! Refreshing model list...
+          </div>
+        `;
+        
+        // Refresh model list after 2 seconds
+        setTimeout(() => {
+          loadAvailableModels();
+          document.getElementById('pullModelName').value = '';
+          statusDiv.innerHTML = '';
+          btn.disabled = false;
+        }, 2000);
+      } else {
+        statusDiv.innerHTML = `
+          <div class="alert alert-danger alert-sm mb-0">
+            <i class="mdi mdi-alert-circle me-2"></i>
+            Error: ${data.error}
+          </div>
+        `;
+        btn.disabled = false;
+      }
+    })
+    .catch(error => {
+      console.error('Error pulling model:', error);
+      statusDiv.innerHTML = `
+        <div class="alert alert-danger alert-sm mb-0">
+          <i class="mdi mdi-alert-circle me-2"></i>
+          Failed to pull model. Make sure Ollama container is running.
+        </div>
+      `;
+      btn.disabled = false;
+    });
+  }
+
+  // Allow Enter key to trigger pull
+  document.getElementById('pullModelName')?.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      pullCustomModel();
+    }
+  });
+</script>
 {% endblock page_level_script %}
+

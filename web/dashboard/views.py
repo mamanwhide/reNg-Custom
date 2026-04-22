@@ -29,6 +29,7 @@ from startScan.models import *
 from targetApp.models import Domain
 from dashboard.models import *
 from paraKang.definitions import *
+from paraKang.common_func import get_available_ollama_model_names
 
 
 logger = logging.getLogger(__name__)
@@ -281,14 +282,14 @@ def llm_settings(request, slug):
         messages.success(request, 'LLM Settings updated successfully!')
         return redirect('llm_settings', slug=slug)
     
-    # Available Ollama models
-    ollama_models = [
-        'mistral',           # mistral:7b - recommended
-        'neural-chat',       # neural-chat:7b
-        'dolphin-mixtral',   # dolphin-mixtral:8x7b
-        'llama2',            # llama2:7b
-        'openchat',          # openchat:7b
-    ]
+    # Available Ollama models - now fetched dynamically from Ollama instance
+    # Fallback to default list if Ollama is not available
+    ollama_models = get_available_ollama_model_names()
+    
+    # If no models available from Ollama, provide empty list to allow dynamic fetch from frontend
+    if not ollama_models:
+        logger.info('No models found in local Ollama instance. Will load dynamically from frontend.')
+        ollama_models = []
     
     context = {
         'ollama_settings': ollama_settings,

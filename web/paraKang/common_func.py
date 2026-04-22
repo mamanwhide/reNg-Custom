@@ -1239,6 +1239,35 @@ def get_hackerone_key_username():
 	return (hackerone_key[0].username, hackerone_key[0].key) if hackerone_key else None
 
 
+def get_available_ollama_models():
+	"""
+		Fetch available Ollama models from local Ollama instance.
+		Returns: list of model dicts with name, size, modified_at
+	"""
+	try:
+		list_models_url = f'{OLLAMA_INSTANCE}/api/tags'
+		response = requests.get(list_models_url, timeout=10)
+		if response.status_code == 200:
+			models_data = response.json()
+			models = models_data.get('models', [])
+			return models
+		else:
+			logger.warning(f"Failed to fetch Ollama models: status {response.status_code}")
+			return []
+	except Exception as e:
+		logger.error(f"Error fetching Ollama models: {e}")
+		return []
+
+
+def get_available_ollama_model_names():
+	"""
+		Fetch list of available Ollama model names.
+		Returns: list of model names as strings
+	"""
+	models = get_available_ollama_models()
+	return [model.get('name', '').split(':')[0] for model in models if model.get('name')]
+
+
 def parse_llm_vulnerability_report(report):
 	report = report.replace('**', '')
 	data = {}

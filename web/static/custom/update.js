@@ -24,7 +24,7 @@ function check_parakang_update() {
     window.localStorage.getItem("update_available") === "true"
   ) {
     // redirect to github release page
-    window.open("https://github.com/yogeshojha/parakang/releases", "_blank");
+    window.open("https://github.com/mamanwhide/paraKang/releases", "_blank");
   } else {
     Swal.fire({
       title: "Checking paraKang latest version...",

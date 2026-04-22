@@ -1,15 +1,20 @@
 
 import openai
 import re
-from paraKang.common_func import get_open_ai_key, parse_llm_vulnerability_report
+from paraKang.common_func import (
+	get_open_ai_key, 
+	parse_llm_vulnerability_report,
+	get_available_ollama_model_names
+)
 from paraKang.definitions import VULNERABILITY_DESCRIPTION_SYSTEM_MESSAGE, ATTACK_SUGGESTION_GPT_SYSTEM_PROMPT, OLLAMA_INSTANCE
 from langchain_community.llms import Ollama
 
 from dashboard.models import OllamaSettings
 
 
-VALID_OLLAMA_MODELS = ['mistral', 'neural-chat', 'dolphin-mixtral', 'llama2', 'openchat']
-DEFAULT_OLLAMA_MODEL = VALID_OLLAMA_MODELS[0]
+# Fallback models for when Ollama is not available or to show recommended models
+DEFAULT_RECOMMENDED_MODELS = ['mistral', 'neural-chat', 'dolphin-mixtral', 'llama2', 'openchat']
+DEFAULT_OLLAMA_MODEL = DEFAULT_RECOMMENDED_MODELS[0]
 DEFAULT_OPENAI_MODEL = 'gpt-3.5-turbo'
 
 
@@ -17,7 +22,10 @@ class LLMVulnerabilityReportGenerator:
 
 	def __init__(self, logger):
 		selected_model = OllamaSettings.objects.first()
-		self.model_name = selected_model.selected_model if selected_model and selected_model.selected_model in VALID_OLLAMA_MODELS else DEFAULT_OLLAMA_MODEL
+		
+		# Use selected model if available, otherwise use default
+		# No strict validation needed - let Ollama handle model availability
+		self.model_name = selected_model.selected_model if selected_model else DEFAULT_OLLAMA_MODEL
 		self.use_ollama = selected_model.use_ollama if selected_model else False
 		self.openai_api_key = None
 		self.logger = logger
@@ -138,7 +146,10 @@ class LLMAttackSuggestionGenerator:
 
 	def __init__(self, logger):
 		selected_model = OllamaSettings.objects.first()
-		self.model_name = selected_model.selected_model if selected_model and selected_model.selected_model in VALID_OLLAMA_MODELS else DEFAULT_OLLAMA_MODEL
+		
+		# Use selected model if available, otherwise use default
+		# No strict validation needed - let Ollama handle model availability
+		self.model_name = selected_model.selected_model if selected_model else DEFAULT_OLLAMA_MODEL
 		self.use_ollama = selected_model.use_ollama if selected_model else False
 		self.openai_api_key = None
 		self.logger = logger

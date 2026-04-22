@@ -20,7 +20,7 @@ Your contributions are again highly appreciated!
 
 Please report [bugs here on GitHub Issues section][1].
 
-[1]: https://github.com/yogeshojha/parakang/issues/new
+[1]: https://github.com/mamanwhide/paraKang/issues/new
 
 
 ## Feature requests
@@ -40,7 +40,7 @@ If paraKang happens to be your first open-source project to contribute to, pleas
 ```
 cd parakang
 # Assign upstream
-git remote add upstream https://github.com/yogeshojha/parakang.git
+git remote add upstream https://github.com/mamanwhide/paraKang.git
 ```
 4. If cloning was done a while ago, please get the latest changes from upstream
 ```

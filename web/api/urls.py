@@ -180,6 +180,10 @@ urlpatterns = [
         OllamaManager.as_view(),
         name='ollama_manager'),
     path(
+        'ollama/models/',
+        OllamaModelsAPI.as_view(),
+        name='ollama_models_api'),
+    path(
         'parakang/update/',
         ParaKangUpdateCheck.as_view(),
         name='check_parakang_update'),

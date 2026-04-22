@@ -82,7 +82,7 @@ else
   echo "Skipping Firefox install (no network)"
 fi
 
-# Temporary fix for whatportis bug - See https://github.com/yogeshojha/parakang/issues/984
+# Temporary fix for whatportis bug - See https://github.com/mamanwhide/paraKang/issues/984
 WHATPORTIS_CLI=$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)" 2>/dev/null) || true
 if [ -n "$WHATPORTIS_CLI" ]; then
   sed -i 's/purge()/truncate()/g' "$WHATPORTIS_CLI" || true

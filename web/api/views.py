@@ -25,7 +25,7 @@ from recon_note.models import *
 from paraKang.celery import app
 from paraKang.common_func import *
 from paraKang.database_utils import *
-from paraKang.definitions import ABORTED_TASK, INITIATED_TASK, LIVE_SCAN
+from paraKang.definitions import ABORTED_TASK, INITIATED_TASK, LIVE_SCAN, OLLAMA_INSTANCE, DEFAULT_GPT_MODELS
 from paraKang.tasks import *
 from paraKang.llm import *
 from paraKang.utilities import remove_lead_and_trail_slash
@@ -425,6 +425,124 @@ class OllamaManager(APIView):
 		except Exception as e:
 			response['error'] = str(e)
 		return Response(response)
+
+
+class OllamaModelsAPI(APIView):
+	"""
+	API endpoint untuk manage model list Ollama secara dinamis
+	"""
+	
+	def get(self, request):
+		"""
+		Fetch semua model yang tersedia dari Ollama instance
+		GET /api/ollama/models/available/
+		"""
+		try:
+			list_models_url = f'{OLLAMA_INSTANCE}/api/tags'
+			response = requests.get(list_models_url, timeout=10)
+			
+			if response.status_code == 200:
+				models_data = response.json()
+				models = models_data.get('models', [])
+				
+				# Format response untuk dropdown
+				formatted_models = []
+				for model in models:
+					model_name = model.get('name', '')
+					model_size = model.get('size', 0)
+					model_size_gb = model_size / (1024 ** 3)
+					formatted_models.append({
+						'name': model_name,
+						'display_name': f"{model_name} ({model_size_gb:.1f}GB)",
+						'size': model_size,
+						'size_gb': f"{model_size_gb:.1f}",
+						'modified_at': model.get('modified_at', ''),
+					})
+				
+				return Response({
+					'status': True,
+					'models': formatted_models,
+					'count': len(formatted_models)
+				}, status=status.HTTP_200_OK)
+			else:
+				return Response({
+					'status': False,
+					'error': f'Failed to fetch models: HTTP {response.status_code}'
+				}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+				
+		except requests.exceptions.Timeout:
+			return Response({
+				'status': False,
+				'error': 'Ollama instance timeout. Make sure Ollama container is running.'
+			}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+		except Exception as e:
+			logger.error(f"Error fetching Ollama models: {e}")
+			return Response({
+				'status': False,
+				'error': str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+	
+	def post(self, request):
+		"""
+		Pull model dari Ollama registry secara background/async
+		POST /api/ollama/models/pull/
+		Body: {'model': 'model_name'}
+		"""
+		permission_classes = [HasPermission]
+		permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+		
+		try:
+			model_name = request.data.get('model') or request.query_params.get('model')
+			
+			if not model_name:
+				return Response({
+					'status': False,
+					'error': 'Model name is required'
+				}, status=status.HTTP_400_BAD_REQUEST)
+			
+			pull_model_api = f'{OLLAMA_INSTANCE}/api/pull'
+			
+			# Start pull request (non-blocking)
+			_response = requests.post(
+				pull_model_api,
+				json={
+					'name': model_name,
+					'stream': False
+				},
+				timeout=3600  # 1 hour timeout untuk pull
+			).json()
+			
+			if _response.get('error'):
+				return Response({
+					'status': False,
+					'error': _response.get('error')
+				}, status=status.HTTP_400_BAD_REQUEST)
+			else:
+				# Update selected model
+				OllamaSettings.objects.update_or_create(
+					defaults={
+						'selected_model': model_name,
+						'use_ollama': True
+					},
+					id=1
+				)
+				
+				return Response({
+					'status': True,
+					'message': f'Model {model_name} pulled successfully'
+				}, status=status.HTTP_200_OK)
+				
+		except requests.exceptions.Timeout:
+			return Response({
+				'status': False,
+				'error': 'Pull request timeout. The model may still be downloading.'
+			}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+		except Exception as e:
+			logger.error(f"Error pulling Ollama model: {e}")
+			return Response({
+				'status': False,
+				'error': str(e)
+			}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GPTAttackSuggestion(APIView):
