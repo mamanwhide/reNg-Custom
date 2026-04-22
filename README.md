@@ -1,7 +1,7 @@
 
 <div align="center">
 
-# ParaKang AI MCP Agents v6.0
+# ParaKang ASM v1.9
 
 ## Integrated Penetration Testing & Reconnaissance Automation Platform
 
@@ -1074,19 +1074,6 @@ All changes are tracked through git. The table below documents commit history si
 | `b97625c` | 2026-02-28 | feat: optimize Gunicorn; unify network binding to 0.0.0.0; close 7 HIGH security gaps |
 | `dc1efef` | 2026-02-28 | fix(gunicorn): raise limit-request-line to 8190 for DataTables with long query |
 | `49e8e06` | 2026-02-27 | feat: initial paraKang-Custom fork; 27 security findings from deep audit (2 CRITICAL, 7 HIGH, 10 MEDIUM, 8 LOW), all fixed; Nginx hardening |
-
-### Security Audit Summary
-
-| Level | Count | Status |
-|--------|---------|--------|
-| CRITICAL | 2 | All fixed |
-| HIGH | 7 | All fixed |
-| MEDIUM | 10 | All fixed |
-| LOW | 8 | All fixed |
-| **Total** | **27** | **All fixed** |
-
-For detailed information, see [PARAKANG_DEEP_AUDIT_V2.md](PARAKANG_DEEP_AUDIT_V2.md).
-
 ---
 
 ## What's New
@@ -1102,14 +1089,14 @@ ParaKang now includes **12+ autonomous AI agents** that enhance reconnaissance a
 
 ### Key Improvements (v6.0)
 
-- ✅ **150+ integrated security tools**
-- ✅ **Advanced OSINT with HUMINT and SIGINT models**
-- ✅ **Dynamic proxy system with automatic refresh**
-- ✅ **Comprehensive DAST template coverage (249+ templates)**
-- ✅ **Role-based access control (3 levels)**
-- ✅ **REST API with 12+ endpoints**
-- ✅ **Automatic false-positive reduction**
-- ✅ **LLM-enhanced reporting**
+- **150+ integrated security tools**
+- **Advanced OSINT with HUMINT and SIGINT models**
+- **Dynamic proxy system with automatic refresh**
+- **Comprehensive DAST template coverage (249+ templates)**
+- **Role-based access control (3 levels)**
+- **REST API with 12+ endpoints**
+- **Automatic false-positive reduction**
+- **LLM-enhanced reporting**
 
 ---
 
@@ -1117,4 +1104,4 @@ License: [GPLv3](LICENSE)
 
 ---
 
-<p align="center">Made with ❤️ for the security community</p>
+<p align="center">Made with ❤️ by vulnLab f0r the Good Hum4n /:)\</p>
