@@ -156,6 +156,10 @@ urlpatterns = [
         LLMVulnerabilityReportView.as_view(),
         name='gpt_vulnerability_report_generator'),
     path(
+        'tools/gpt_vulnerability_prompt/',
+        LLMVulnerabilityPromptView.as_view(),
+        name='gpt_vulnerability_prompt_generator'),
+    path(
         'tools/gpt_get_possible_attacks/',
         GPTAttackSuggestion.as_view(),
         name='gpt_get_possible_attacks'),

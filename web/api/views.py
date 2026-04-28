@@ -4,6 +4,8 @@ import logging
 import requests
 import validators
 import requests
+import subprocess
+import threading
 
 from ipaddress import IPv4Network
 from django.db.models import CharField, Count, F, Q, Value
@@ -40,6 +42,29 @@ from api.serializers import *
 
 
 logger = logging.getLogger(__name__)
+
+
+def _pull_ollama_model_background(model_name):
+	"""Pull an Ollama model in the background and keep the result in web logs."""
+	try:
+		logger.info(f'Background: Starting to pull Ollama model: {model_name}')
+		result = subprocess.run(
+			['docker', 'exec', 'ollama', 'ollama', 'pull', model_name],
+			text=True,
+		)
+		if result.returncode == 0:
+			logger.info(f'Background: Successfully pulled Ollama model: {model_name}')
+			OllamaSettings.objects.update_or_create(
+				defaults={
+					'selected_model': model_name,
+					'use_ollama': True
+				},
+				id=1
+			)
+		else:
+			logger.warning(f'Background: Failed to pull model {model_name} with return code {result.returncode}')
+	except Exception as e:
+		logger.error(f'Background: Error pulling model {model_name}: {str(e)}')
 
 
 class ToggleBugBountyModeView(APIView):
@@ -484,13 +509,10 @@ class OllamaModelsAPI(APIView):
 	
 	def post(self, request):
 		"""
-		Pull model dari Ollama registry secara background/async
+		Queue model pull so the request returns immediately.
 		POST /api/ollama/models/pull/
 		Body: {'model': 'model_name'}
 		"""
-		permission_classes = [HasPermission]
-		permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
-		
 		try:
 			model_name = request.data.get('model') or request.query_params.get('model')
 			
@@ -500,37 +522,17 @@ class OllamaModelsAPI(APIView):
 					'error': 'Model name is required'
 				}, status=status.HTTP_400_BAD_REQUEST)
 			
-			pull_model_api = f'{OLLAMA_INSTANCE}/api/pull'
-			
-			# Start pull request (non-blocking)
-			_response = requests.post(
-				pull_model_api,
-				json={
-					'name': model_name,
-					'stream': False
-				},
-				timeout=3600  # 1 hour timeout untuk pull
-			).json()
-			
-			if _response.get('error'):
-				return Response({
-					'status': False,
-					'error': _response.get('error')
-				}, status=status.HTTP_400_BAD_REQUEST)
-			else:
-				# Update selected model
-				OllamaSettings.objects.update_or_create(
-					defaults={
-						'selected_model': model_name,
-						'use_ollama': True
-					},
-					id=1
-				)
-				
-				return Response({
-					'status': True,
-					'message': f'Model {model_name} pulled successfully'
-				}, status=status.HTTP_200_OK)
+			threading.Thread(
+				target=_pull_ollama_model_background,
+				args=(model_name,),
+				daemon=True
+			).start()
+
+			return Response({
+				'status': True,
+				'queued': True,
+				'message': f'Model {model_name} pull started in background'
+			}, status=status.HTTP_202_ACCEPTED)
 				
 		except requests.exceptions.Timeout:
 			return Response({
@@ -613,6 +615,59 @@ class LLMVulnerabilityReportView(APIView):
 				'status': False,
 				'error': f'LLM task timed out or failed: {str(e)}'
 			})
+		return Response(response)
+
+
+class LLMVulnerabilityPromptView(APIView):
+	def post(self, request):
+		req = self.request
+		vulnerability_id = req.data.get('id') or req.query_params.get('id')
+		user_prompt = req.data.get('prompt') or req.query_params.get('prompt')
+		if not vulnerability_id:
+			return Response({
+				'status': False,
+				'error': 'Missing POST param Vulnerability `id`'
+			}, status=status.HTTP_400_BAD_REQUEST)
+		if not user_prompt:
+			return Response({
+				'status': False,
+				'error': 'Missing POST param `prompt`'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			vulnerability = Vulnerability.objects.get(id=vulnerability_id)
+		except Exception:
+			return Response({
+				'status': False,
+				'error': 'Vulnerability not found with id ' + str(vulnerability_id)
+			}, status=status.HTTP_404_NOT_FOUND)
+
+		path = vulnerability.get_path() if vulnerability.http_url else '/'
+		stored = GPTVulnerabilityReport.objects.filter(url_path=path).filter(title=vulnerability.name).first()
+		severity_label = NUCLEI_REVERSE_SEVERITY_MAP.get(vulnerability.severity, 'unknown')
+		if stored:
+			references_text = ', '.join([ref.url for ref in stored.references.all()])
+		else:
+			references_text = vulnerability.get_refs_str()
+		if not references_text or references_text == '•':
+			references_text = 'N/A'
+		vulnerability_context = [
+			f'Finding Title: {vulnerability.name}',
+			f'HTTP URL: {vulnerability.http_url or "N/A"}',
+			f'Severity: {severity_label}',
+			f'Template: {vulnerability.template or "N/A"}',
+			f'Template ID: {vulnerability.template_id or "N/A"}',
+			f'Type: {vulnerability.type or "N/A"}',
+			f'Description: {(stored.description if stored and stored.description else vulnerability.description) or "N/A"}',
+			f'Impact: {(stored.impact if stored and stored.impact else vulnerability.impact) or "N/A"}',
+			f'Remediation: {(stored.remediation if stored and stored.remediation else vulnerability.remediation) or "N/A"}',
+			f'References: {references_text}',
+		]
+		vulnerability_context = '\n'.join(vulnerability_context)
+		gpt_generator = LLMVulnerabilityPromptGenerator(logger=logger)
+		response = gpt_generator.ask_vulnerability_question(vulnerability_context, user_prompt)
+		response['vulnerability_name'] = vulnerability.name
+		response['vulnerability_id'] = vulnerability.id
 		return Response(response)
 
 

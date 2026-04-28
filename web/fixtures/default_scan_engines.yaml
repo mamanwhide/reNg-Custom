@@ -41,6 +41,7 @@
       [\"Cookie: Test\"]"
     default_engine: true
 - model: scanEngine.enginetype
+  pk: 2
   fields:
     engine_name: Subdomain Scan
     yaml_configuration: "subdomain_discovery: {\r\n  'uses_tools': [\r\n    'subfinder',

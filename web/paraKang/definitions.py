@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import logging
+import os
 import re
 
 ###############################################################################
@@ -481,7 +482,7 @@ FOUR_OH_FOUR_URL = '/404/'
 ###############################################################################
 # OLLAMA DEFINITIONS
 ###############################################################################
-OLLAMA_INSTANCE = 'http://ollama:11434'
+OLLAMA_INSTANCE = os.getenv('OLLAMA_INSTANCE', 'http://ollama:11434')
 
 DEFAULT_GPT_MODELS = [
     {
@@ -568,6 +569,20 @@ ATTACK_SUGGESTION_GPT_SYSTEM_PROMPT = """
     I'm seeking insights into potential technical web application attacks that could be executed on this subdomain, along with explanations for why these attacks are feasible given the discovered information.
     Please provide a detailed list of these attack types and their underlying technical rationales on every attacks you suggested.
     Also suggest if any CVE ID, known exploits, existing vulnerabilities, any news articles URL related to the information provided to you.
+"""
+
+
+VULNERABILITY_FINDINGS_GPT_SYSTEM_PROMPT = """
+    You are a security analysis assistant focused on scan findings.
+    You will be given a vulnerability context that may include a title, URL, severity, description, impact, remediation, and references.
+    Answer the user's question using that context and general defensive security knowledge.
+
+    Requirements:
+    - Stay concise, technical, and actionable.
+    - Do not invent details that are not supported by the finding context.
+    - If the context is insufficient, say what is missing and what should be verified.
+    - Prefer defensive guidance, validation steps, and remediation advice.
+    - Keep the response in plain text.
 """
 
 

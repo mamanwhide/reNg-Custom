@@ -373,9 +373,29 @@ CACHES = {
 '''
     Security Settings
 '''
+def _default_csrf_trusted_origins(domain_name):
+    origins = {
+        f'https://{domain_name}',
+        f'http://{domain_name}',
+        'https://localhost',
+        'http://localhost',
+        'https://127.0.0.1',
+        'http://127.0.0.1',
+        'https://[::1]',
+        'http://[::1]',
+    }
+
+    host_only = domain_name.split(':', 1)[0].strip()
+    if host_only:
+        origins.add(f'https://{host_only}')
+        origins.add(f'http://{host_only}')
+
+    return sorted(origins)
+
+
 CSRF_TRUSTED_ORIGINS = env.list(
     'CSRF_TRUSTED_ORIGINS',
-    default=[f'https://{DOMAIN_NAME}', f'http://{DOMAIN_NAME}']
+    default=_default_csrf_trusted_origins(DOMAIN_NAME)
 )
 SESSION_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True

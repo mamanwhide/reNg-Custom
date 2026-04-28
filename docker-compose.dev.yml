@@ -49,9 +49,16 @@ services:
       - POSTGRES_HOST=${POSTGRES_HOST}
       - MAX_CONCURRENCY=${MAX_CONCURRENCY}
       - MIN_CONCURRENCY=${MIN_CONCURRENCY}
+      - OLLAMA_INSTANCE=http://ollama:11434
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
     networks:
       - parakang_network
 
@@ -71,6 +78,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_HOST=${POSTGRES_HOST}
+      - OLLAMA_INSTANCE=http://ollama:11434
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
@@ -98,6 +106,7 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_HOST=${POSTGRES_HOST}
+      - OLLAMA_INSTANCE=http://ollama:11434
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
@@ -110,9 +119,16 @@ services:
     ports:
       - "0.0.0.0:8000:8000"
     depends_on:
-      - db
-      - celery
-      - celery-beat
+      db:
+        condition: service_started
+      celery:
+        condition: service_started
+      celery-beat:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
     networks:
       - parakang_network
   ollama:
@@ -122,6 +138,29 @@ services:
     networks:
       - parakang_network
     restart: always
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_NUM_PARALLEL=2
+      - OLLAMA_HOST=0.0.0.0:11434
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  ollama-pull:
+    image: ollama/ollama
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-lc"]
+    command: sh -c "ollama pull ${OLLAMA_MODEL:-mistral}"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - parakang_network
+    restart: "no"
 
 networks:
   parakang_network:

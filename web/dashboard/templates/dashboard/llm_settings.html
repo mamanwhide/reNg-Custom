@@ -313,14 +313,15 @@ LLM Settings
     .then(response => response.json())
     .then(data => {
       if (data.status) {
+        const message = data.message || `Model ${modelName} pull started in background`;
         statusDiv.innerHTML = `
           <div class="alert alert-success alert-sm mb-0">
             <i class="mdi mdi-check-circle me-2"></i>
-            Model ${modelName} pulled successfully! Refreshing model list...
+            ${message}. Refreshing model list soon...
           </div>
         `;
         
-        // Refresh model list after 2 seconds
+        // Refresh model list after a short delay so the UI stays responsive.
         setTimeout(() => {
           loadAvailableModels();
           document.getElementById('pullModelName').value = '';

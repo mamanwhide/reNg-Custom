@@ -419,6 +419,114 @@ mark{
 .scan-config-modal .config-list li {
   padding: 5px 0;
 }
+
+.rn-vuln-llm-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3283f6, #20c997);
+  color: #fff;
+  z-index: 1080;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.rn-vuln-llm-fab:hover {
+  transform: translateY(-1px);
+}
+
+.rn-vuln-llm-widget {
+  display: none;
+  position: fixed;
+  right: 24px;
+  bottom: 170px;
+  width: min(330px, calc(100vw - 48px));
+  z-index: 1080;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(50, 131, 246, 0.18);
+  overflow: hidden;
+  max-height: min(42vh, 330px);
+}
+
+.rn-vuln-llm-widget.is-open {
+  display: block;
+}
+
+[data-theme="dark"] .rn-vuln-llm-widget {
+  background: rgba(18, 24, 38, 0.96);
+  border-color: rgba(103, 160, 255, 0.22);
+}
+
+.rn-vuln-llm-widget__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px 16px;
+  background: linear-gradient(135deg, rgba(50, 131, 246, 0.12), rgba(32, 201, 151, 0.10));
+}
+
+.rn-vuln-llm-widget__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  letter-spacing: 0.2px;
+}
+
+[data-theme="dark"] .rn-vuln-llm-widget__title {
+  color: #e5eefc;
+}
+
+.rn-vuln-llm-widget__body {
+  padding: 14px 16px 16px 16px;
+  overflow-y: auto;
+  max-height: calc(min(42vh, 330px) - 58px);
+}
+
+.rn-vuln-llm-widget__actions {
+  position: sticky;
+  bottom: 0;
+  background: inherit;
+  padding-top: 12px;
+  z-index: 1;
+}
+
+.rn-vuln-llm-widget__response {
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.rn-vuln-llm-widget__input {
+  min-height: 110px;
+  resize: vertical;
+}
+
+@media (max-width: 991.98px) {
+  .rn-vuln-llm-fab {
+    right: 12px;
+    bottom: 12px;
+  }
+
+  .rn-vuln-llm-widget {
+    right: 12px;
+    left: 12px;
+    bottom: 76px;
+    width: auto;
+    max-height: min(40vh, 300px);
+  }
+
+	.rn-vuln-llm-widget__body {
+		max-height: calc(min(40vh, 300px) - 58px);
+	}
+}
 .scan-config-modal .badge {
   margin-left: 5px;
 }

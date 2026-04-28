@@ -48,6 +48,86 @@ function loadCSS(href) {
 	});
 }
 
+window.selectedVulnPromptTarget = null;
+
+function update_selected_vuln_prompt_target_ui(target) {
+	const label = document.getElementById('selected-vuln-prompt-target');
+	const button = document.getElementById('ask-vuln-llm-btn');
+	if (!label || !button) {
+		return;
+	}
+	if (target) {
+		label.innerHTML = `Selected finding: <strong>${escapeHtml(target.title)}</strong>`;
+		button.disabled = false;
+	} else {
+		label.textContent = 'No finding selected. Click a vulnerability row first.';
+		button.disabled = true;
+	}
+}
+
+function setSelectedVulnPromptTarget(id, title, httpUrl) {
+	window.selectedVulnPromptTarget = { id: id, title: title, httpUrl: httpUrl || '' };
+	update_selected_vuln_prompt_target_ui(window.selectedVulnPromptTarget);
+}
+
+function toggle_vuln_prompt_widget(forceOpen) {
+	const widget = document.getElementById('vuln-llm-widget');
+	if (!widget) {
+		return;
+	}
+	const shouldOpen = typeof forceOpen === 'boolean' ? forceOpen : !widget.classList.contains('is-open');
+	widget.classList.toggle('is-open', shouldOpen);
+	widget.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+	if (shouldOpen) {
+		focus_vuln_prompt_widget();
+	}
+}
+
+function open_selected_vuln_prompt_modal() {
+	const widget = document.getElementById('vuln-llm-widget');
+	if (widget && widget.classList.contains('is-open')) {
+		close_vuln_prompt_widget();
+		return;
+	}
+	if (!window.selectedVulnPromptTarget) {
+		Swal.fire({
+			icon: 'info',
+			title: 'Select a finding first',
+			text: 'Click a vulnerability row to select it before asking the LLM.',
+		});
+		return;
+	}
+	toggle_vuln_prompt_widget(true);
+}
+
+function close_vuln_prompt_widget() {
+	toggle_vuln_prompt_widget(false);
+}
+
+function focus_vuln_prompt_widget() {
+	const widget = document.getElementById('vuln-llm-widget');
+	const promptInput = document.getElementById('gpt-vuln-prompt');
+	if (promptInput) {
+		promptInput.focus();
+		promptInput.select();
+	}
+}
+
+function reset_vuln_prompt_widget() {
+	const promptInput = document.getElementById('gpt-vuln-prompt');
+	const statusDiv = document.getElementById('gpt-vuln-prompt-status');
+	const answerDiv = document.getElementById('gpt-vuln-prompt-answer');
+	if (promptInput) {
+		promptInput.value = '';
+	}
+	if (statusDiv) {
+		statusDiv.innerHTML = '';
+	}
+	if (answerDiv) {
+		answerDiv.innerHTML = '';
+	}
+}
+
 function getCurrentProjectSlug(){
 	return document.querySelector('input[name="current_project"]').value;
 }
@@ -3242,7 +3322,7 @@ async function fetch_gpt_vuln_details(id, title) {
 		Swal.close();
 		console.log(data);
 		if (data.status) {
-			render_gpt_vuln_modal(data, title);
+			render_gpt_vuln_modal(data, title, id);
 		}
 		else{
 			Swal.close();
@@ -3264,7 +3344,113 @@ async function fetch_gpt_vuln_details(id, title) {
 }
 
 
-function render_gpt_vuln_modal(data, title){
+async function send_gpt_vuln_prompt_request(id, prompt){
+	const api = "/api/tools/gpt_vulnerability_prompt/";
+	try {
+		const response = await fetch(api, {
+			method: 'POST',
+			credentials: "same-origin",
+			headers: {
+				"Content-Type": "application/json",
+				"X-CSRFToken": getCookie("csrftoken")
+			},
+			body: JSON.stringify({
+				id: id,
+				prompt: prompt,
+			})
+		});
+		if (!response.ok) {
+			throw new Error('Request failed');
+		}
+		const data = await response.json();
+		return data;
+	} catch (error) {
+		throw new Error('Request failed');
+	}
+}
+
+
+function render_vuln_prompt_panel(id, title, context_text){
+	return `
+		<div class="card border-0 shadow-sm mb-3" style="background: linear-gradient(135deg, rgba(13,110,253,0.08), rgba(32,201,151,0.08));">
+			<div class="card-body">
+				<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+					<div>
+						<h5 class="mb-1">Ask LLM about this finding</h5>
+						<small class="text-muted">The answer will use the vulnerability context from this scan.</small>
+					</div>
+					<span class="badge bg-soft-primary text-primary">Finding Assistant</span>
+				</div>
+				${context_text ? `<div class="alert alert-light border mb-3"><strong>Context:</strong><br>${escapeHtml(context_text).replace(/\r?\n/g, '<br />')}</div>` : ''}
+				<div class="mb-2">
+					<label class="form-label">Your prompt</label>
+					<textarea class="form-control" id="gpt-vuln-prompt" rows="4" placeholder="Example: What should I verify first, and how do I confirm the root cause?"></textarea>
+				</div>
+				<div class="d-flex justify-content-end">
+					<button type="button" class="btn btn-primary btn-sm" onclick='ask_gpt_vuln_prompt(${id}, ${JSON.stringify(title)})'>Ask LLM</button>
+				</div>
+				<div id="gpt-vuln-prompt-status" class="mt-3"></div>
+				<div id="gpt-vuln-prompt-answer" class="mt-3"></div>
+			</div>
+		</div>
+	`;
+}
+
+
+async function ask_gpt_vuln_prompt(id, title){
+	const promptInput = document.getElementById('gpt-vuln-prompt');
+	const statusDiv = document.getElementById('gpt-vuln-prompt-status');
+	const answerDiv = document.getElementById('gpt-vuln-prompt-answer');
+	const prompt = promptInput ? promptInput.value.trim() : '';
+	if (!prompt) {
+		statusDiv.innerHTML = '<div class="alert alert-warning alert-sm mb-0">Please enter a prompt first.</div>';
+		return;
+	}
+	statusDiv.innerHTML = `
+		<div class="alert alert-info alert-sm mb-0">
+			<div class="spinner-border spinner-border-sm me-2" role="status" style="width: 1rem; height: 1rem;">
+				<span class="visually-hidden">Loading...</span>
+			</div>
+			Asking LLM about ${escapeHtml(title)}...
+		</div>
+	`;
+	answerDiv.innerHTML = '';
+	try {
+		const data = await send_gpt_vuln_prompt_request(id, prompt);
+		if (data.status) {
+			statusDiv.innerHTML = '<div class="alert alert-success alert-sm mb-0">LLM response received.</div>';
+			answerDiv.innerHTML = `
+				<div class="card border-success rn-vuln-llm-widget__response">
+					<div class="card-body">
+						<h6 class="card-title mb-2">Answer</h6>
+						<div class="small text-body" style="white-space: normal;">${escapeHtml(data.answer).replace(/\r?\n/g, '<br />')}</div>
+					</div>
+				</div>
+			`;
+			if (promptInput) {
+				promptInput.focus();
+			}
+		} else {
+			statusDiv.innerHTML = '<div class="alert alert-danger alert-sm mb-0">Unable to get an LLM response.</div>';
+			answerDiv.innerHTML = `<div class="alert alert-danger mb-0">${escapeHtml(data.error || 'Request failed')}</div>`;
+		}
+	} catch (error) {
+		statusDiv.innerHTML = '<div class="alert alert-danger alert-sm mb-0">Failed to reach the LLM endpoint.</div>';
+		answerDiv.innerHTML = '<div class="alert alert-danger mb-0">Something went wrong.</div>';
+		if (promptInput) {
+			promptInput.focus();
+		}
+	}
+}
+
+
+function open_gpt_vuln_prompt_modal(id, title){
+	setSelectedVulnPromptTarget(id, title, '');
+	focus_vuln_prompt_widget();
+}
+
+
+function render_gpt_vuln_modal(data, title, id){
 	$('#modal-title').empty();
 	$('#modal-content').empty();
 	$('#modal-footer').empty();
@@ -3272,25 +3458,35 @@ function render_gpt_vuln_modal(data, title){
 
 	// CRT-09 fix: Escape all LLM response data before rendering as HTML
 	var modal_content = `
-		<h4>Description</h4>
-		<p>${escapeHtml(data.description)}</p>
-		<h4>Impact</h4>
-		<p>${escapeHtml(data.impact)}</p>
-		<h4>Remediation</h4>
-		<p>${escapeHtml(data.remediation)}</p>
-		<h4>References</h4>
-		<p><ul>
+		<div class="card border-0 shadow-sm mb-3" style="background: linear-gradient(135deg, rgba(13,110,253,0.08), rgba(32,201,151,0.08));">
+			<div class="card-body">
+				<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+					<div>
+						<h5 class="mb-1">GPT Vulnerability Report</h5>
+						<small class="text-muted">Structured report generated from the finding context.</small>
+					</div>
+					<span class="badge bg-soft-primary text-primary">LLM</span>
+				</div>
+				<h4>Description</h4>
+				<p>${escapeHtml(data.description)}</p>
+				<h4>Impact</h4>
+				<p>${escapeHtml(data.impact)}</p>
+				<h4>Remediation</h4>
+				<p>${escapeHtml(data.remediation)}</p>
+				<h4>References</h4>
+				<p><ul>
 	`;
 
 	data.references.forEach(reference => {
 		modal_content += `<li><a href="${escapeAttr(reference)}" target="_blank">${escapeHtml(reference)}</a></li>`;
 	});
 
-	modal_content += '</ul></p>';
+	modal_content += '</ul></p></div></div>';
+	modal_content += render_vuln_prompt_panel(id, title, `Finding ID: ${id}\nUse the prompt box below to ask a follow-up question about this finding.`);
 
 	$('#modal-content').append(modal_content);
 	$('#modal_dialog').modal('show');
-}
+	}
 
 
 function get_datatable_col_index(lookup, cols){
